@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model School {
+  id           String        @id @default(uuid())
+  name         String
+  shortName    String?
+  category     String
+  country      String
+  state        String
+  address      String
+  website      String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  bankAccounts BankAccount[]
+  classes      Class[]
+  classSetup   ClassSetup?
+  schoolAdmins SchoolAdmin[]
+  students     Student[]
+  teachers     Teacher[]
+}
+
+model SuperAdmin {
+  id        String   @id @default(uuid())
+  firstName String
+  lastName  String
+  email     String   @unique
+  password  String
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SchoolAdmin {
+  id        String          @id @default(uuid())
+  firstName String
+  lastName  String
+  email     String          @unique
+  phone     String?
+  password  String
+  gender    String?
+  role      SchoolAdminRole
+  roleOther String?
+  schoolId  String
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  isActive  Boolean         @default(true)
+  roles     String[]        @default(["TEACHER"])
+  school    School          @relation(fields: [schoolId], references: [id])
+}
+
+model Teacher {
+  id                    String     @id @default(uuid())
+  email                 String     @unique
+  password              String
+  phone                 String?
+  gender                String?
+  schoolId              String
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  address               String?
+  armsAssigned          String[]
+  classesAssigned       String[]
+  countryOfResidence    String?
+  dateOfBirth           DateTime?
+  department            String?
+  formTeacherArms       String[]
+  formTeacherAssignment String?
+  formTeacherClasses    String[]
+  fullName              String
+  isActive              Boolean    @default(true)
+  lgaOfOrigin           String?
+  maritalStatus         String?
+  nationality           String?
+  nextOfKin             Json?
+  staffId               String     @unique
+  staffType             String?
+  stateOfOrigin         String?
+  stateOfResidence      String?
+  roles                 String[]   @default(["TEACHER"])
+  subjects              String[]
+  formTeacherOfArms     ClassArm[] @relation("FormTeacher")
+  school                School     @relation(fields: [schoolId], references: [id])
+}
+
+model Student {
+  id                 String    @id @default(uuid())
+  firstName          String
+  lastName           String
+  email              String?
+  password           String
+  phone              String?
+  gender             String?
+  schoolId           String
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  isActive           Boolean   @default(true)
+  roles              String[]  @default(["STUDENT"])
+  address            String?
+  classArmId         String?
+  classId            String?
+  country            String?
+  dateOfBirth        DateTime?
+  lgaOfOrigin        String?
+  nationality        String?
+  parentsEmail       String?
+  parentsFullName    String?
+  parentsPhoneNumber String?
+  registrationNumber String    @unique @map("registration_number")
+  state              String?
+  stateOfOrigin      String?
+  classArm           ClassArm? @relation(fields: [classArmId], references: [id])
+  class              Class?    @relation(fields: [classId], references: [id])
+  school             School    @relation(fields: [schoolId], references: [id])
+}
+
+model ClassSetup {
+  id        String   @id @default(uuid())
+  schoolId  String   @unique
+  config    Json
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  school    School   @relation(fields: [schoolId], references: [id])
+}
+
+model Otp {
+  id        String   @id @default(uuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model OnboardingProgress {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  step      Int      @default(1)
+  data      Json
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model Idempotency {
+  key        String   @id
+  response   Json
+  createdAt  DateTime @default(now())
+  statusCode Int      @default(200)
+}
+
+model BankAccount {
+  id            String   @id @default(uuid())
+  schoolId      String
+  accountName   String
+  accountNumber String
+  bankName      String
+  bankCode      String?
+  currency      String   @default("NGN")
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  isPrimary     Boolean  @default(true)
+  school        School   @relation(fields: [schoolId], references: [id])
+
+  @@unique([schoolId, accountNumber, bankName])
+}
+
+model Class {
+  id        String     @id @default(uuid())
+  name      String
+  schoolId  String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  school    School     @relation(fields: [schoolId], references: [id])
+  arms      ClassArm[]
+  students  Student[]
+
+  @@unique([schoolId, name])
+}
+
+model ClassArm {
+  id            String    @id @default(uuid())
+  name          String
+  classId       String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  formTeacherId String?
+  class         Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  formTeacher   Teacher?  @relation("FormTeacher", fields: [formTeacherId], references: [id])
+  students      Student[]
+
+  @@unique([classId, name])
+}
+
+enum SchoolAdminRole {
+  SCHOOL_OWNER
+  DIRECTOR
+  PRINCIPAL
+  TEACHER
+  ICT_ADMIN
+  OTHERS
+  SUB_ADMIN
+}
