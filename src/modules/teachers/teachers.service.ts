@@ -248,7 +248,76 @@ export class TeachersService {
       throw new NotFoundException(`Teacher with ID ${id} not found`);
     }
 
-    const { password, ...result } = teacher;
-    return result;
+    return teacher;
+  }
+
+  /**
+   * Fetch classes and arms assigned to a specific teacher.
+   */
+  async getAssignedClasses(id: string, schoolId: string) {
+    const teacher = (await this.findOne(id)) as any;
+
+    if (teacher.schoolId !== schoolId) {
+      throw new BadRequestException('Teacher does not belong to this school');
+    }
+
+    // The teacher model has arrays: classesAssigned (IDs or names) and armsAssigned (IDs or names)
+    // To be robust, we search by both ID and name since the DTO examples suggest names.
+    const classes = await (this.prisma as any).class.findMany({
+      where: {
+        schoolId,
+        OR: [
+          { id: { in: teacher.classesAssigned } },
+          { name: { in: teacher.classesAssigned } },
+        ],
+      },
+      include: {
+        arms: {
+          where: {
+            OR: [
+              { id: { in: teacher.armsAssigned } },
+              { name: { in: teacher.armsAssigned } },
+            ],
+          },
+        },
+      },
+    });
+
+    return classes;
+  }
+
+  /**
+   * Fetch students belonging to classes/arms assigned to a teacher.
+   */
+  async getAssignedStudents(id: string, schoolId: string) {
+    const teacher = (await this.findOne(id)) as any;
+
+    if (teacher.schoolId !== schoolId) {
+      throw new BadRequestException('Teacher does not belong to this school');
+    }
+
+    // Fetch students who are in the classes or arms assigned to the teacher
+    // We search by both ID and name for the assigned classes and arms
+    const students = await (this.prisma as any).student.findMany({
+      where: {
+        schoolId,
+        OR: [
+          { classId: { in: teacher.classesAssigned } },
+          { class: { name: { in: teacher.classesAssigned } } },
+          { classArmId: { in: teacher.armsAssigned } },
+          { classArm: { name: { in: teacher.armsAssigned } } },
+        ],
+      },
+      include: {
+        class: true,
+        classArm: true,
+      },
+      orderBy: [
+        { class: { name: 'asc' } },
+        { lastName: 'asc' },
+      ],
+    });
+
+    return students.map(({ password, ...s }: any) => s);
   }
 }

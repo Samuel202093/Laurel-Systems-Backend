@@ -156,4 +156,54 @@ export class TeachersController {
       data,
     });
   }
+
+  @Get(':id/school/:schoolId/assigned-classes')
+  @ApiOperation({ summary: 'Fetch classes and arms assigned to a particular teacher in a school' })
+  @ApiParam({ name: 'id', description: 'The unique ID of the teacher' })
+  @ApiParam({ name: 'schoolId', description: 'The unique ID of the school' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'List of assigned classes and arms retrieved successfully.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Teacher or school not found.',
+  })
+  async getAssignedClasses(
+    @Param('id') id: string,
+    @Param('schoolId') schoolId: string,
+    @Res() res: Response,
+  ) {
+    const data = await this.teachersService.getAssignedClasses(id, schoolId);
+    return res.status(HttpStatus.OK).json({
+      statusCode: HttpStatus.OK,
+      message: 'Assigned classes retrieved successfully',
+      data,
+    });
+  }
+
+  @Get(':id/school/:schoolId/assigned-students')
+  @ApiOperation({ summary: 'Fetch students based on the classes assigned to the teacher' })
+  @ApiParam({ name: 'id', description: 'The unique ID of the teacher' })
+  @ApiParam({ name: 'schoolId', description: 'The unique ID of the school' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'List of students assigned to the teacher retrieved successfully.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Teacher or school not found.',
+  })
+  async getAssignedStudents(
+    @Param('id') id: string,
+    @Param('schoolId') schoolId: string,
+    @Res() res: Response,
+  ) {
+    const data = await this.teachersService.getAssignedStudents(id, schoolId);
+    return res.status(HttpStatus.OK).json({
+      statusCode: HttpStatus.OK,
+      message: 'Assigned students retrieved successfully',
+      data,
+    });
+  }
 }

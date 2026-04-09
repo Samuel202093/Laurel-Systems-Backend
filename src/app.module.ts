@@ -10,6 +10,8 @@ import { TeachersModule } from './modules/teachers/teachers.module';
 import { StudentsModule } from './modules/students/students.module';
 import { MailModule } from './modules/mail/mail.module';
 import { BankAccountsModule } from './modules/bank-accounts/bank-accounts.module';
+import { SubjectsModule } from './modules/subjects/subjects.module';
+import { GradingModule } from './modules/grading/grading.module';
 import { IdempotencyMiddleware } from './common/middleware/idempotency.middleware';
 
 @Module({
@@ -25,6 +27,8 @@ import { IdempotencyMiddleware } from './common/middleware/idempotency.middlewar
     StudentsModule,
     MailModule,
     BankAccountsModule,
+    SubjectsModule,
+    GradingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

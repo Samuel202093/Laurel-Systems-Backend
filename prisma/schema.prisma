@@ -23,6 +23,9 @@ model School {
   schoolAdmins SchoolAdmin[]
   students     Student[]
   teachers     Teacher[]
+  subjects     Subject[]
+  gradingSystem GradingSystem[]
+  academicSessions AcademicSession[]
 }
 
 model SuperAdmin {
@@ -196,6 +199,21 @@ model ClassArm {
   @@unique([classId, name])
 }
 
+model Subject {
+  id          String   @id @default(uuid())
+  name        String
+  code        String?
+  description String?
+  category    String   @default("General")
+  schoolId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  school      School   @relation(fields: [schoolId], references: [id])
+
+  @@unique([schoolId, name])
+  @@unique([schoolId, code])
+}
+
 enum SchoolAdminRole {
   SCHOOL_OWNER
   DIRECTOR
@@ -205,3 +223,81 @@ enum SchoolAdminRole {
   OTHERS
   SUB_ADMIN
 }
+
+model GradingSystem {
+  id                String             @id @default(uuid())
+  schoolId          String
+  sessionId         String
+  termId            String?
+  passMark          Int                @default(40)
+  grades            GradeLevel[]
+  assessments       AssessmentType[]
+  promotionCriteria PromotionCriteria?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  school            School             @relation(fields: [schoolId], references: [id])
+  session           AcademicSession    @relation(fields: [sessionId], references: [id])
+  term              AcademicTerm?      @relation(fields: [termId], references: [id])
+
+  @@unique([schoolId, sessionId, termId])
+}
+
+model AcademicSession {
+  id            String          @id @default(uuid())
+  schoolId      String
+  name          String          // e.g. "2025/2026"
+  startDate     DateTime
+  endDate       DateTime
+  isActive      Boolean         @default(false)
+  gradingSystems GradingSystem[]
+  terms         AcademicTerm[]
+  school        School          @relation(fields: [schoolId], references: [id])
+
+  @@unique([schoolId, name])
+}
+
+model AcademicTerm {
+  id              String          @id @default(uuid())
+  sessionId       String
+  name            String          // e.g. "First Term"
+  startDate       DateTime
+  endDate         DateTime
+  isActive        Boolean         @default(false)
+  gradingSystems  GradingSystem[]
+  session         AcademicSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, name])
+}
+
+model GradeLevel {
+  id              String        @id @default(uuid())
+  gradingSystemId String
+  name            String
+  abbreviation    String
+  minScore        Int
+  maxScore        Int
+  point           Float?
+  remark          String?
+  gradingSystem   GradingSystem @relation(fields: [gradingSystemId], references: [id], onDelete: Cascade)
+}
+
+model AssessmentType {
+  id              String        @id @default(uuid())
+  gradingSystemId String
+  name            String
+  abbreviation    String
+  maxScore        Int
+  weight          Int
+  gradingSystem   GradingSystem @relation(fields: [gradingSystemId], references: [id], onDelete: Cascade)
+}
+
+model PromotionCriteria {
+  id                String        @id @default(uuid())
+  gradingSystemId   String        @unique
+  minAverageScore   Int           @default(40)
+  minSubjectsPassed Int           @default(0)
+  mandatorySubjects String[]      @default([])
+  useCumulativeAverage Boolean    @default(true)
+  gradingSystem     GradingSystem @relation(fields: [gradingSystemId], references: [id], onDelete: Cascade)
+}
+
