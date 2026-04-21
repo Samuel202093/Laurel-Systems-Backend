@@ -26,6 +26,7 @@ model School {
   subjects     Subject[]
   gradingSystem GradingSystem[]
   academicSessions AcademicSession[]
+  results       Result[]
 }
 
 model SuperAdmin {
@@ -47,6 +48,8 @@ model SchoolAdmin {
   phone     String?
   password  String
   gender    String?
+  avatar    String?
+  avatarPublicId String?
   role      SchoolAdminRole
   roleOther String?
   schoolId  String
@@ -63,6 +66,8 @@ model Teacher {
   password              String
   phone                 String?
   gender                String?
+  avatar                String?
+  avatarPublicId        String?
   schoolId              String
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
@@ -89,6 +94,7 @@ model Teacher {
   subjects              String[]
   formTeacherOfArms     ClassArm[] @relation("FormTeacher")
   school                School     @relation(fields: [schoolId], references: [id])
+  results               Result[]
 }
 
 model Student {
@@ -120,6 +126,7 @@ model Student {
   classArm           ClassArm? @relation(fields: [classArmId], references: [id])
   class              Class?    @relation(fields: [classId], references: [id])
   school             School    @relation(fields: [schoolId], references: [id])
+  scores             StudentScore[]
 }
 
 model ClassSetup {
@@ -181,6 +188,7 @@ model Class {
   school    School     @relation(fields: [schoolId], references: [id])
   arms      ClassArm[]
   students  Student[]
+  results   Result[]
 
   @@unique([schoolId, name])
 }
@@ -195,6 +203,7 @@ model ClassArm {
   class         Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
   formTeacher   Teacher?  @relation("FormTeacher", fields: [formTeacherId], references: [id])
   students      Student[]
+  results       Result[]
 
   @@unique([classId, name])
 }
@@ -209,6 +218,7 @@ model Subject {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   school      School   @relation(fields: [schoolId], references: [id])
+  results     Result[]
 
   @@unique([schoolId, name])
   @@unique([schoolId, code])
@@ -251,6 +261,7 @@ model AcademicSession {
   isActive      Boolean         @default(false)
   gradingSystems GradingSystem[]
   terms         AcademicTerm[]
+  results       Result[]
   school        School          @relation(fields: [schoolId], references: [id])
 
   @@unique([schoolId, name])
@@ -264,6 +275,7 @@ model AcademicTerm {
   endDate         DateTime
   isActive        Boolean         @default(false)
   gradingSystems  GradingSystem[]
+  results         Result[]
   session         AcademicSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, name])
@@ -299,5 +311,54 @@ model PromotionCriteria {
   mandatorySubjects String[]      @default([])
   useCumulativeAverage Boolean    @default(true)
   gradingSystem     GradingSystem @relation(fields: [gradingSystemId], references: [id], onDelete: Cascade)
+}
+
+model Result {
+  id              String         @id @default(uuid())
+  schoolId        String
+  classId         String
+  classArmId      String
+  subjectId       String
+  sessionId       String
+  termId          String?
+  teacherId       String
+  status          ResultStatus   @default(PENDING)
+  approvedById    String?
+  rejectionReason String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  
+  school          School         @relation(fields: [schoolId], references: [id])
+  class           Class          @relation(fields: [classId], references: [id])
+  classArm        ClassArm       @relation(fields: [classArmId], references: [id])
+  subject         Subject        @relation(fields: [subjectId], references: [id])
+  session         AcademicSession @relation(fields: [sessionId], references: [id])
+  term            AcademicTerm?  @relation(fields: [termId], references: [id])
+  teacher         Teacher        @relation(fields: [teacherId], references: [id])
+  
+  scores          StudentScore[]
+
+  @@unique([schoolId, classId, classArmId, subjectId, sessionId, termId])
+}
+
+model StudentScore {
+  id           String   @id @default(uuid())
+  resultId     String
+  studentId    String
+  assessmentScores Json     // e.g., { "CA1": 15, "Exam": 50 }
+  totalScore   Float
+  grade        String?
+  remark       String?
+  
+  result       Result   @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  student      Student  @relation(fields: [studentId], references: [id])
+
+  @@unique([resultId, studentId])
+}
+
+enum ResultStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 

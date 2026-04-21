@@ -1,8 +1,10 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 import { UpdateTeacherDto } from './dto/update-teacher.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -10,6 +12,7 @@ export class TeachersService {
   constructor(
     private prisma: PrismaService,
     private mailService: MailService,
+    private cloudinary: CloudinaryService,
   ) {}
 
   async create(schoolId: string, dto: CreateTeacherDto) {
@@ -85,7 +88,10 @@ export class TeachersService {
     );
 
     const { password, ...result } = teacher;
-    return result;
+    return {
+      ...result,
+      status: result.isActive ? 'Active' : 'Suspended',
+    };
   }
 
   async assignRoles(id: string, roles: string[]) {
@@ -108,7 +114,10 @@ export class TeachersService {
     });
 
     const { password, ...result } = updatedTeacher;
-    return result;
+    return {
+      ...result,
+      status: result.isActive ? 'Active' : 'Suspended',
+    };
   }
 
   async update(id: string, dto: UpdateTeacherDto) {
@@ -177,7 +186,10 @@ export class TeachersService {
     });
 
     const { password, ...result } = updatedTeacher;
-    return result;
+    return {
+      ...result,
+      status: result.isActive ? 'Active' : 'Suspended',
+    };
   }
 
   async remove(id: string) {
@@ -187,6 +199,15 @@ export class TeachersService {
 
     if (!teacher) {
       throw new NotFoundException(`Teacher with ID ${id} not found`);
+    }
+
+    // Delete profile image from Cloudinary if it exists
+    if (teacher.avatarPublicId) {
+      try {
+        await this.cloudinary.deleteFile(teacher.avatarPublicId);
+      } catch (error) {
+        console.error('Failed to delete avatar from Cloudinary:', error);
+      }
     }
 
     return (this.prisma as any).teacher.delete({
@@ -207,10 +228,16 @@ export class TeachersService {
       throw new BadRequestException('Teacher is already suspended');
     }
 
-    return (this.prisma as any).teacher.update({
+    const updated = await (this.prisma as any).teacher.update({
       where: { id },
       data: { isActive: false },
     });
+
+    const { password, ...result } = updated;
+    return {
+      ...result,
+      status: 'Suspended',
+    };
   }
 
   async activate(id: string) {
@@ -226,17 +253,96 @@ export class TeachersService {
       throw new BadRequestException('Teacher is already active');
     }
 
-    return (this.prisma as any).teacher.update({
+    const updated = await (this.prisma as any).teacher.update({
       where: { id },
       data: { isActive: true },
     });
+
+    const { password, ...result } = updated;
+    return {
+      ...result,
+      status: 'Active',
+    };
+  }
+
+  async updateAvatar(id: string, file: Express.Multer.File) {
+    const teacher = await (this.prisma as any).teacher.findUnique({
+      where: { id },
+    });
+
+    if (!teacher) {
+      throw new NotFoundException(`Teacher with ID ${id} not found`);
+    }
+
+    try {
+      // Delete previous image from Cloudinary if it exists
+      if (teacher.avatarPublicId) {
+        await this.cloudinary.deleteFile(teacher.avatarPublicId);
+      }
+
+      // Upload new image
+      const result = await this.cloudinary.uploadFile(file);
+      
+      const updatedTeacher = await (this.prisma as any).teacher.update({
+        where: { id },
+        data: { 
+          avatar: result.secure_url,
+          avatarPublicId: result.public_id,
+        },
+      });
+
+      const { password, ...res } = updatedTeacher;
+      return {
+        ...res,
+        status: res.isActive ? 'Active' : 'Suspended',
+      };
+    } catch (error) {
+      throw new InternalServerErrorException(
+        error.message || 'Failed to update profile image',
+      );
+    }
+  }
+
+  async changePassword(id: string, dto: ChangePasswordDto) {
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new BadRequestException('Passwords do not match');
+    }
+
+    const teacher = await (this.prisma as any).teacher.findUnique({
+      where: { id },
+    });
+
+    if (!teacher) {
+      throw new NotFoundException(`Teacher with ID ${id} not found`);
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+
+    await (this.prisma as any).teacher.update({
+      where: { id },
+      data: { password: hashedPassword },
+    });
+
+    // Send email notification with new password
+    await this.mailService.sendPasswordChangeEmail(
+      teacher.email,
+      teacher.fullName,
+      dto.newPassword,
+    );
+
+    return { message: 'Password changed successfully' };
   }
 
   async findAll(schoolId: string) {
-    return (this.prisma as any).teacher.findMany({
+    const teachers = await (this.prisma as any).teacher.findMany({
       where: { schoolId },
       orderBy: { createdAt: 'desc' },
     });
+
+    return teachers.map(({ password, ...teacher }: any) => ({
+      ...teacher,
+      status: teacher.isActive ? 'Active' : 'Suspended',
+    }));
   }
 
   async findOne(id: string) {
@@ -248,7 +354,11 @@ export class TeachersService {
       throw new NotFoundException(`Teacher with ID ${id} not found`);
     }
 
-    return teacher;
+    const { password, ...result } = teacher;
+    return {
+      ...result,
+      status: result.isActive ? 'Active' : 'Suspended',
+    };
   }
 
   /**

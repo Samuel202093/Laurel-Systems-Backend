@@ -8,12 +8,17 @@ import {
   Param,
   HttpStatus,
   Res,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { TeachersService } from './teachers.service';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 import { UpdateTeacherDto } from './dto/update-teacher.dto';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiHeader } from '@nestjs/swagger';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiHeader, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Teachers')
 @Controller('teachers')
@@ -108,6 +113,70 @@ export class TeachersController {
     return res.status(HttpStatus.OK).json({
       statusCode: HttpStatus.OK,
       message: 'Staff activated successfully',
+      data,
+    });
+  }
+
+  @Patch(':id/avatar')
+  @UseInterceptors(FileInterceptor('file', {
+    limits: {
+      fileSize: 2 * 1024 * 1024, // 2MB
+    },
+    fileFilter: (req, file, cb) => {
+      if (!file.mimetype.startsWith('image/')) {
+        return cb(new BadRequestException('Only image files are allowed'), false);
+      }
+      cb(null, true);
+    },
+  }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @ApiOperation({ summary: 'Update profile picture' })
+  @ApiParam({ name: 'id', description: 'The unique ID of the teacher' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Profile picture updated.' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Staff not found.' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid file or size.' })
+  async updateAvatar(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Res() res: Response,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded or file is too large (max 2MB)');
+    }
+    const data = await this.teachersService.updateAvatar(id, file);
+    return res.status(HttpStatus.OK).json({
+      statusCode: HttpStatus.OK,
+      message: 'Profile picture updated successfully',
+      data,
+    });
+  }
+
+  @Patch(':id/change-password')
+  @ApiOperation({ summary: 'Change teacher password' })
+  @ApiParam({ name: 'id', description: 'The unique ID of the teacher' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Password changed successfully.' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid data or passwords do not match.' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Staff not found.' })
+  async changePassword(
+    @Param('id') id: string,
+    @Body() changePasswordDto: ChangePasswordDto,
+    @Res() res: Response,
+  ) {
+    const data = await this.teachersService.changePassword(id, changePasswordDto);
+    return res.status(HttpStatus.OK).json({
+      statusCode: HttpStatus.OK,
+      message: 'Password changed successfully',
       data,
     });
   }

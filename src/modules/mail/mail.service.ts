@@ -18,7 +18,8 @@ export class MailService {
     this.transporter = nodemailer.createTransport({
       host: mailHost,
       port: mailPort,
-      secure: mailPort === 465, // true for 465, false for other ports
+      secure: mailPort === 465, // true for 465, false for other ports (like 587)
+      // family: 4,
       auth: {
         user: mailUser,
         pass: mailPassword,
@@ -182,6 +183,75 @@ export class MailService {
       this.logger.log(`Student welcome email sent successfully to ${email}`);
     } catch (error) {
       this.logger.error(`Failed to send student welcome email to ${email}`, error.stack);
+    }
+  }
+
+  async sendPasswordChangeEmail(email: string, fullName: string, newPassword: string) {
+    const schoolName = this.configService.get<string>('SCHOOL_NAME', 'Our School');
+    const senderEmail = this.configService.get<string>('EMAIL_USER');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px; }
+          .header { background-color: #f44336; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+          .content { padding: 30px; background-color: #ffffff; }
+          .footer { text-align: center; padding: 20px; font-size: 12px; color: #777; }
+          .alert { background-color: #fff3e0; padding: 15px; border-left: 4px solid #ff9800; margin: 20px 0; }
+          .credentials { background-color: #f9f9f9; padding: 20px; border-left: 4px solid #f44336; margin: 20px 0; }
+          .credential-item { margin-bottom: 10px; }
+          .label { font-weight: bold; color: #555; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Security Update</h1>
+          </div>
+          <div class="content">
+            <p>Dear <strong>${fullName}</strong>,</p>
+            <p>This is to inform you that the password for your account at <strong>${schoolName}</strong> has been successfully changed.</p>
+            
+            <div class="alert">
+              <p><strong>Warning:</strong> If you did not initiate this change, please contact the school administration or IT support immediately as your account may be compromised.</p>
+            </div>
+
+            <p>For your records, your new login details are:</p>
+            
+            <div class="credentials">
+              <div class="credential-item">
+                <span class="label">Email:</span> <span>${email}</span>
+              </div>
+              <div class="credential-item">
+                <span class="label">New Password:</span> <span>${newPassword}</span>
+              </div>
+            </div>
+            
+            <p>Please keep this information secure and do not share it with anyone.</p>
+            
+            <p>Best regards,<br>The Security Team</p>
+          </div>
+          <div class="footer">
+            <p>&copy; ${new Date().getFullYear()} ${schoolName}. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    try {
+      await this.transporter.sendMail({
+        from: `"${schoolName}" <${senderEmail}>`,
+        to: email,
+        subject: `Security Alert: Your Password Has Been Changed`,
+        html,
+      });
+      this.logger.log(`Password change notification sent successfully to ${email}`);
+    } catch (error) {
+      this.logger.error(`Failed to send password change email to ${email}`, error.stack);
     }
   }
 }

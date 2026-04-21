@@ -3,13 +3,20 @@ import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class GradeLevelDto {
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  name: string;
+  name?: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  abbreviation: string;
+  abbreviation?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  grade?: string;
 
   @ApiProperty()
   @IsInt()

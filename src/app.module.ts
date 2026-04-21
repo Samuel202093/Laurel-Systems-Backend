@@ -12,6 +12,8 @@ import { MailModule } from './modules/mail/mail.module';
 import { BankAccountsModule } from './modules/bank-accounts/bank-accounts.module';
 import { SubjectsModule } from './modules/subjects/subjects.module';
 import { GradingModule } from './modules/grading/grading.module';
+import { CloudinaryModule } from './modules/cloudinary/cloudinary.module';
+import { ResultsModule } from './modules/results/results.module';
 import { IdempotencyMiddleware } from './common/middleware/idempotency.middleware';
 
 @Module({
@@ -29,6 +31,8 @@ import { IdempotencyMiddleware } from './common/middleware/idempotency.middlewar
     BankAccountsModule,
     SubjectsModule,
     GradingModule,
+    CloudinaryModule,
+    ResultsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
