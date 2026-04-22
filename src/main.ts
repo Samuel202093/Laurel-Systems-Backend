@@ -36,4 +36,8 @@ async function bootstrap() {
   console.log(`Application is running on: http://localhost:${port}/api/v1`);
   console.log(`Swagger documentation available at: http://localhost:${port}/api/v1/docs`);
 }
-bootstrap();
+// bootstrap();
+bootstrap().catch((err) => {
+  console.error('Fatal error during bootstrap:', err);
+  process.exit(1);
+});
