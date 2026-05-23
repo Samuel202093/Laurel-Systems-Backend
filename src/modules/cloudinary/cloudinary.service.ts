@@ -5,9 +5,18 @@ import * as streamifier from 'streamifier';
 
 @Injectable()
 export class CloudinaryService {
-  uploadFile(file: Express.Multer.File): Promise<CloudinaryResponse> {
+  uploadFile(
+    file: Express.Multer.File,
+    folder: string = 'general',
+  ): Promise<CloudinaryResponse> {
     return new Promise<CloudinaryResponse>((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
+        { folder,
+           resource_type: 'raw',
+           use_filename: true,
+          unique_filename: true,
+          format: file.originalname.split('.').pop()?.toLowerCase(),
+         },
         (error, result) => {
           if (error) return reject(error);
           resolve(result as CloudinaryResponse);
@@ -20,7 +29,7 @@ export class CloudinaryService {
 
   async deleteFile(publicId: string): Promise<any> {
     return new Promise((resolve, reject) => {
-      cloudinary.uploader.destroy(publicId, (error, result) => {
+      cloudinary.uploader.destroy(publicId, { resource_type: 'raw' }, (error, result) => {
         if (error) return reject(error);
         resolve(result);
       });

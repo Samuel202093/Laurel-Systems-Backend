@@ -101,6 +101,7 @@ export class StudentsService {
           `${student.firstName} ${student.lastName}`,
           student.registrationNumber,
           tempPassword,
+          school.name,
         );
       } catch (error) {
         console.error(`Failed to send welcome email to student ${student.email}:`, error);

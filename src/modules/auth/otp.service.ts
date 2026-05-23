@@ -37,14 +37,15 @@ export class OtpService {
     console.log(`OTP for ${email}: ${code}`);
 
     try {
+      const schoolName = this.configService.get<string>('SCHOOL_NAME', 'School Management');
       await this.transporter.sendMail({
-        from: `"School Management" <${this.configService.get<string>('EMAIL_USER')}>`,
+        from: `"${schoolName}" <${this.configService.get<string>('EMAIL_USER')}>`,
         to: email,
-        subject: 'Your School Onboarding Verification Code',
+        subject: `Your ${schoolName} Onboarding Verification Code`,
         html: `
           <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
             <h2 style="color: #0891b2;">Verify Your Email</h2>
-            <p>Thank you for starting your school onboarding. Use the code below to verify your email address:</p>
+            <p>Thank you for starting your ${schoolName} onboarding. Use the code below to verify your email address:</p>
             <div style="background: #f3f4f6; padding: 15px; font-size: 24px; font-weight: bold; text-align: center; border-radius: 8px; margin: 20px 0;">
               ${code}
             </div>

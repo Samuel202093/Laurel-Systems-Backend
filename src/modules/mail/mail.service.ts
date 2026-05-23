@@ -36,8 +36,8 @@ export class MailService {
     });
   }
 
-  async sendTeacherWelcomeEmail(email: string, fullName: string, staffId: string, tempPassword: string) {
-    const schoolName = this.configService.get<string>('SCHOOL_NAME', 'Our School');
+  async sendTeacherWelcomeEmail(email: string, fullName: string, staffId: string, tempPassword: string, schoolName?: string) {
+    const finalSchoolName = schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
     const loginUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000') + '/login';
     const senderEmail = this.configService.get<string>('EMAIL_USER');
 
@@ -60,11 +60,11 @@ export class MailService {
       <body>
         <div class="container">
           <div class="header">
-            <h1>Welcome to ${schoolName}</h1>
+            <h1>Welcome to ${finalSchoolName}</h1>
           </div>
           <div class="content">
             <p>Dear <strong>${fullName}</strong>,</p>
-            <p>Welcome to the team! You have been registered as a staff member at <strong>${schoolName}</strong>. Your account has been created successfully.</p>
+            <p>Welcome to the team! You have been registered as a staff member at <strong>${finalSchoolName}</strong>. Your account has been created successfully.</p>
             
             <p>Please use the credentials below to log in to the school management portal:</p>
             
@@ -91,7 +91,7 @@ export class MailService {
             <p>Best regards,<br>The Administration Team</p>
           </div>
           <div class="footer">
-            <p>&copy; ${new Date().getFullYear()} ${schoolName}. All rights reserved.</p>
+            <p>&copy; ${new Date().getFullYear()} ${finalSchoolName}. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -100,9 +100,9 @@ export class MailService {
 
     try {
       await this.transporter.sendMail({
-        from: `"${schoolName}" <${senderEmail}>`,
+        from: `"${finalSchoolName}" <${senderEmail}>`,
         to: email,
-        subject: `Welcome to ${schoolName} - Your Login Details`,
+        subject: `Welcome to ${finalSchoolName} - Your Login Details`,
         html,
       });
       this.logger.log(`Welcome email sent successfully to ${email}`);
@@ -111,8 +111,8 @@ export class MailService {
     }
   }
 
-  async sendStudentWelcomeEmail(email: string, fullName: string, registrationNumber: string, tempPassword: string) {
-    const schoolName = this.configService.get<string>('SCHOOL_NAME', 'Our School');
+  async sendStudentWelcomeEmail(email: string, fullName: string, registrationNumber: string, tempPassword: string, schoolName?: string) {
+    const finalSchoolName = schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
     const loginUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000') + '/login';
     const senderEmail = this.configService.get<string>('EMAIL_USER');
 
@@ -130,28 +130,29 @@ export class MailService {
           .credentials { background-color: #f9f9f9; padding: 20px; border-left: 4px solid #4CAF50; margin: 20px 0; }
           .credential-item { margin-bottom: 10px; }
           .label { font-weight: bold; color: #555; }
+          .highlight { color: #4CAF50; font-weight: bold; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <h1>Welcome to ${schoolName}</h1>
+            <h1>Welcome to ${finalSchoolName}</h1>
           </div>
           <div class="content">
             <p>Dear <strong>${fullName}</strong>,</p>
-            <p>Welcome! You have been registered as a student at <strong>${schoolName}</strong>. Your account has been created successfully.</p>
+            <p>Welcome! You have been registered as a student at <strong>${finalSchoolName}</strong>. Your account has been created successfully.</p>
             
-            <p>Please use the credentials below to log in to the school portal:</p>
+            <p>To access the school portal, please <span class="highlight">login with your Registration Number and Password</span> provided below:</p>
             
             <div class="credentials">
               <div class="credential-item">
-                <span class="label">Registration Number:</span> <span>${registrationNumber}</span>
+                <span class="label">Registration Number:</span> <span class="highlight">${registrationNumber}</span>
               </div>
               <div class="credential-item">
                 <span class="label">Email:</span> <span>${email}</span>
               </div>
               <div class="credential-item">
-                <span class="label">Temporary Password:</span> <span>${tempPassword}</span>
+                <span class="label">Temporary Password:</span> <span class="highlight">${tempPassword}</span>
               </div>
             </div>
             
@@ -166,7 +167,7 @@ export class MailService {
             <p>Best regards,<br>The Administration Team</p>
           </div>
           <div class="footer">
-            <p>&copy; ${new Date().getFullYear()} ${schoolName}. All rights reserved.</p>
+            <p>&copy; ${new Date().getFullYear()} ${finalSchoolName}. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -175,9 +176,9 @@ export class MailService {
 
     try {
       await this.transporter.sendMail({
-        from: `"${schoolName}" <${senderEmail}>`,
+        from: `"${finalSchoolName}" <${senderEmail}>`,
         to: email,
-        subject: `Welcome to ${schoolName} - Student Account Details`,
+        subject: `Welcome to ${finalSchoolName} - Student Account Details`,
         html,
       });
       this.logger.log(`Student welcome email sent successfully to ${email}`);
@@ -186,8 +187,8 @@ export class MailService {
     }
   }
 
-  async sendPasswordChangeEmail(email: string, fullName: string, newPassword: string) {
-    const schoolName = this.configService.get<string>('SCHOOL_NAME', 'Our School');
+  async sendPasswordChangeEmail(email: string, fullName: string, newPassword: string, schoolName?: string) {
+    const finalSchoolName = schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
     const senderEmail = this.configService.get<string>('EMAIL_USER');
 
     const html = `
@@ -213,7 +214,7 @@ export class MailService {
           </div>
           <div class="content">
             <p>Dear <strong>${fullName}</strong>,</p>
-            <p>This is to inform you that the password for your account at <strong>${schoolName}</strong> has been successfully changed.</p>
+            <p>This is to inform you that the password for your account at <strong>${finalSchoolName}</strong> has been successfully changed.</p>
             
             <div class="alert">
               <p><strong>Warning:</strong> If you did not initiate this change, please contact the school administration or IT support immediately as your account may be compromised.</p>
@@ -235,7 +236,7 @@ export class MailService {
             <p>Best regards,<br>The Security Team</p>
           </div>
           <div class="footer">
-            <p>&copy; ${new Date().getFullYear()} ${schoolName}. All rights reserved.</p>
+            <p>&copy; ${new Date().getFullYear()} ${finalSchoolName}. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -244,7 +245,7 @@ export class MailService {
 
     try {
       await this.transporter.sendMail({
-        from: `"${schoolName}" <${senderEmail}>`,
+        from: `"${finalSchoolName}" <${senderEmail}>`,
         to: email,
         subject: `Security Alert: Your Password Has Been Changed`,
         html,
@@ -253,5 +254,199 @@ export class MailService {
     } catch (error) {
       this.logger.error(`Failed to send password change email to ${email}`, error.stack);
     }
+  }
+
+  async sendAssignmentNotificationEmail(
+    assignment: {
+      title: string;
+      description: string;
+      dueDate: Date;
+      term: string;
+      assignmentType: string;
+      academicSession: string;
+      totalMarks?: number | null;
+      fileUrl?: string | null;
+      subjectName: string;
+      className: string;
+      teacherName: string;
+    },
+    students: { email: string; firstName: string; lastName: string }[],
+    schoolName?: string,
+  ) {
+    const finalSchoolName = schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
+    const portalUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000') + '/student/assignments';
+    const senderEmail = this.configService.get<string>('EMAIL_USER');
+
+    const formattedDueDate = new Date(assignment.dueDate).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
+    const formattedDueTime = new Date(assignment.dueDate).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    const assignmentTypeLabel =
+      assignment.assignmentType.charAt(0).toUpperCase() +
+      assignment.assignmentType.slice(1).replace(/-/g, ' ');
+
+    const buildHtml = (studentName: string) => `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f6f9; }
+          .wrapper { max-width: 640px; margin: 0 auto; padding: 20px; }
+          .container { background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08); }
+          .header { background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%); color: white; padding: 32px 30px; }
+          .header h1 { margin: 0 0 6px 0; font-size: 22px; font-weight: 700; }
+          .header p { margin: 0; font-size: 14px; opacity: 0.9; }
+          .badge { display: inline-block; background-color: rgba(255,255,255,0.2); color: #ffffff; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 12px; }
+          .content { padding: 30px; }
+          .greeting { font-size: 15px; margin-bottom: 20px; }
+          .assignment-card { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 24px; margin: 20px 0; }
+          .assignment-title { font-size: 18px; font-weight: 700; color: #1a73e8; margin: 0 0 16px 0; }
+          .detail-grid { display: table; width: 100%; border-collapse: collapse; }
+          .detail-row { display: table-row; }
+          .detail-label { display: table-cell; padding: 8px 12px 8px 0; font-weight: 600; color: #64748b; font-size: 13px; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; vertical-align: top; width: 140px; }
+          .detail-value { display: table-cell; padding: 8px 0; font-size: 14px; color: #1e293b; vertical-align: top; }
+          .due-date-highlight { background-color: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 14px 18px; margin: 20px 0; display: flex; align-items: center; }
+          .due-date-highlight .icon { font-size: 20px; margin-right: 12px; }
+          .due-date-highlight .text { font-size: 14px; color: #9a3412; }
+          .due-date-highlight .text strong { color: #7c2d12; }
+          .description-section { margin: 20px 0; }
+          .description-section h3 { font-size: 14px; font-weight: 600; color: #475569; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.3px; }
+          .description-section p { font-size: 14px; color: #334155; background-color: #f8fafc; padding: 16px; border-radius: 8px; border-left: 3px solid #1a73e8; margin: 0; }
+          .cta-section { text-align: center; margin: 28px 0 10px; }
+          .button { display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%); color: white !important; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; letter-spacing: 0.3px; }
+          .divider { height: 1px; background-color: #e2e8f0; margin: 24px 0; }
+          .footer { text-align: center; padding: 24px 30px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; }
+          .footer p { margin: 0 0 4px 0; font-size: 12px; color: #94a3b8; }
+          .footer .school-name { font-weight: 600; color: #64748b; }
+          ${assignment.fileUrl ? '.attachment-notice { background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 13px; color: #166534; }' : ''}
+        </style>
+      </head>
+      <body>
+        <div class="wrapper">
+          <div class="container">
+            <div class="header">
+              <h1>📋 New Assignment Posted</h1>
+              <p>${finalSchoolName} — Academic Portal</p>
+              <span class="badge">${assignmentTypeLabel}</span>
+            </div>
+            <div class="content">
+              <p class="greeting">Dear <strong>${studentName}</strong>,</p>
+              <p style="font-size: 14px; color: #475569;">A new assignment has been posted for your class by <strong>${assignment.teacherName}</strong>. Please review the details below and ensure timely submission.</p>
+              
+              <div class="assignment-card">
+                <h2 class="assignment-title">${assignment.title}</h2>
+                <div class="detail-grid">
+                  <div class="detail-row">
+                    <span class="detail-label">Subject</span>
+                    <span class="detail-value">${assignment.subjectName}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Class</span>
+                    <span class="detail-value">${assignment.className}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Type</span>
+                    <span class="detail-value">${assignmentTypeLabel}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Term</span>
+                    <span class="detail-value">${assignment.term}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Session</span>
+                    <span class="detail-value">${assignment.academicSession}</span>
+                  </div>
+                  ${assignment.totalMarks ? `
+                  <div class="detail-row">
+                    <span class="detail-label">Total Marks</span>
+                    <span class="detail-value">${assignment.totalMarks}</span>
+                  </div>` : ''}
+                </div>
+              </div>
+
+              <div class="due-date-highlight">
+                <span class="icon">⏰</span>
+                <span class="text"><strong>Due Date:</strong> ${formattedDueDate} at ${formattedDueTime}</span>
+              </div>
+
+              <div class="description-section">
+                <h3>Assignment Description</h3>
+                <p>${assignment.description}</p>
+              </div>
+
+              ${assignment.fileUrl ? `
+              <div class="attachment-notice">
+                📎 <strong>Attachment included</strong> — A file has been attached to this assignment. Log in to the portal to download it.
+              </div>` : ''}
+
+              <div class="cta-section">
+                <a href="${portalUrl}" class="button">View Assignment on Portal</a>
+              </div>
+
+              <div class="divider"></div>
+
+              <p style="font-size: 13px; color: #64748b; margin-bottom: 0;">
+                Please ensure you submit your work before the deadline. Late submissions may not be accepted. 
+                If you have any questions regarding this assignment, please contact your teacher <strong>${assignment.teacherName}</strong> directly.
+              </p>
+            </div>
+            <div class="footer">
+              <p class="school-name">${finalSchoolName}</p>
+              <p>&copy; ${new Date().getFullYear()} ${finalSchoolName}. All rights reserved.</p>
+              <p style="margin-top: 8px;">This is an automated notification. Please do not reply to this email.</p>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const validStudents = students.filter((s) => s.email);
+    if (validStudents.length === 0) {
+      this.logger.warn('No students with email addresses found for assignment notification');
+      return;
+    }
+
+    this.logger.log(
+      `Sending assignment notification to ${validStudents.length} student(s) for "${assignment.title}"`,
+    );
+
+    // Send emails in parallel batches to avoid overwhelming the mail server
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < validStudents.length; i += BATCH_SIZE) {
+      const batch = validStudents.slice(i, i + BATCH_SIZE);
+      await Promise.allSettled(
+        batch.map(async (student) => {
+          try {
+            await this.transporter.sendMail({
+              from: `"${finalSchoolName}" <${senderEmail}>`,
+              to: student.email,
+              subject: `New Assignment: ${assignment.title} — ${assignment.subjectName} | ${finalSchoolName}`,
+              html: buildHtml(`${student.firstName} ${student.lastName}`),
+            });
+            this.logger.log(`Assignment notification sent to ${student.email}`);
+          } catch (error) {
+            this.logger.error(
+              `Failed to send assignment notification to ${student.email}: ${error.message}`,
+              error.stack,
+            );
+          }
+        }),
+      );
+    }
+
+    this.logger.log(
+      `Assignment notification dispatch completed for "${assignment.title}"`,
+    );
   }
 }

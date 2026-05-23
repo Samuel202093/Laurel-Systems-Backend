@@ -76,16 +76,19 @@ export class GradingService {
 
       if (!session) return null;
 
-      const termIdValue = termId && termId.toLowerCase() !== 'session-wide' 
-        ? (await (this.prisma as any).academicTerm.findFirst({
-            where: {
-              sessionId: session.id,
-              OR: [{ id: termId }, { name: termId }],
-            },
-          }))?.id || null
-        : null;
+      const termIdValue =
+        termId && termId.toLowerCase() !== 'session-wide'
+          ? (
+              await (this.prisma as any).academicTerm.findFirst({
+                where: {
+                  sessionId: session.id,
+                  OR: [{ id: termId }, { name: termId }],
+                },
+              })
+            )?.id || null
+          : null;
 
-      return await (this.prisma as any).gradingSystem.findFirst({
+      const gradingSystem = await (this.prisma as any).gradingSystem.findFirst({
         where: {
           schoolId,
           sessionId: session.id,
@@ -97,6 +100,24 @@ export class GradingService {
           promotionCriteria: true,
         },
       });
+
+      // If no term-specific grading system is found, fallback to session-wide (termId: null)
+      if (!gradingSystem && termIdValue !== null) {
+        return await (this.prisma as any).gradingSystem.findFirst({
+          where: {
+            schoolId,
+            sessionId: session.id,
+            termId: null,
+          },
+          include: {
+            grades: true,
+            assessments: true,
+            promotionCriteria: true,
+          },
+        });
+      }
+
+      return gradingSystem;
     } catch (error) {
       throw new InternalServerErrorException('Error retrieving grading system');
     }
@@ -106,92 +127,116 @@ export class GradingService {
     const { sessionId: sessionName, termId: termName, ...data } = dto;
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        // 1. Resolve or Create Academic Session
-        const session = await this.getOrCreateSession(schoolId, sessionName, tx);
+      return await this.prisma.$transaction(
+        async (tx) => {
+          // 1. Resolve or Create Academic Session
+          const session = await this.getOrCreateSession(schoolId, sessionName, tx);
 
-        // 2. Resolve or Create Academic Term
-        const term = await this.getOrCreateTerm(session.id, termName || '', session, tx);
-        const termIdValue = term?.id || null;
+          // 2. Resolve or Create Academic Term
+          const term = await this.getOrCreateTerm(session.id, termName || '', session, tx);
+          const termIdValue = term?.id || null;
 
-        // 3. Map grades to handle "grade" property from frontend
-        const mappedGrades = data.grades.map((g) => ({
-          name: g.name || g.grade || '',
-          abbreviation: g.abbreviation || g.grade || '',
-          minScore: g.minScore,
-          maxScore: g.maxScore,
-          point: g.point,
-          remark: g.remark,
-        }));
+          // 3. Map grades to handle "grade" property from frontend
+          const mappedGrades = data.grades.map((g) => ({
+            name: g.name || g.grade || '',
+            abbreviation: g.abbreviation || g.grade || '',
+            minScore: g.minScore,
+            maxScore: g.maxScore,
+            point: g.point,
+            remark: g.remark,
+          }));
 
-        // 4. Check if grading system exists
-        const gradingSystem = await tx.gradingSystem.findFirst({
-          where: {
-            schoolId,
-            sessionId: session.id,
-            termId: termIdValue,
-          },
-        });
-
-        if (!gradingSystem) {
-          // Create new
-          return await tx.gradingSystem.create({
-            data: {
+          // 4. Check if grading system exists
+          const gradingSystem = await tx.gradingSystem.findFirst({
+            where: {
               schoolId,
               sessionId: session.id,
               termId: termIdValue,
+            },
+          });
+
+          if (!gradingSystem) {
+            // Create new grading system with all related records
+            return await tx.gradingSystem.create({
+              data: {
+                schoolId,
+                sessionId: session.id,
+                termId: termIdValue,
+                passMark: data.passMark,
+                grades: {
+                  create: mappedGrades,
+                },
+                assessments: {
+                  create: data.assessments,
+                },
+                promotionCriteria: {
+                  create: data.promotionCriteria,
+                },
+              },
+              include: {
+                grades: true,
+                assessments: true,
+                promotionCriteria: true,
+              },
+            });
+          }
+
+          // 5. Update existing grading system
+          // grades and assessments are one-to-many: safe to use nested deleteMany + create
+          await tx.gradingSystem.update({
+            where: { id: gradingSystem.id },
+            data: {
               passMark: data.passMark,
               grades: {
+                deleteMany: {},
                 create: mappedGrades,
               },
               assessments: {
+                deleteMany: {},
                 create: data.assessments,
               },
-              promotionCriteria: {
-                create: data.promotionCriteria,
-              },
             },
+          });
+
+          // 6. promotionCriteria is one-to-one (@unique on gradingSystemId),
+          //    so we upsert it separately to avoid relation constraint errors
+          await tx.promotionCriteria.upsert({
+            where: { gradingSystemId: gradingSystem.id },
+            update: {
+              minAverageScore: data.promotionCriteria.minAverageScore,
+              minSubjectsPassed: data.promotionCriteria.minSubjectsPassed,
+              mandatorySubjects: data.promotionCriteria.mandatorySubjects,
+              useCumulativeAverage: data.promotionCriteria.useCumulativeAverage,
+            },
+            create: {
+              gradingSystemId: gradingSystem.id,
+              minAverageScore: data.promotionCriteria.minAverageScore,
+              minSubjectsPassed: data.promotionCriteria.minSubjectsPassed,
+              mandatorySubjects: data.promotionCriteria.mandatorySubjects,
+              useCumulativeAverage: data.promotionCriteria.useCumulativeAverage,
+            },
+          });
+
+          // 7. Return the fully updated grading system
+          return await tx.gradingSystem.findUnique({
+            where: { id: gradingSystem.id },
             include: {
               grades: true,
               assessments: true,
               promotionCriteria: true,
             },
           });
-        }
-
-        // 5. Update existing version
-        // Delete old related records
-        await tx.gradeLevel.deleteMany({ where: { gradingSystemId: gradingSystem.id } });
-        await tx.assessmentType.deleteMany({ where: { gradingSystemId: gradingSystem.id } });
-        await tx.promotionCriteria.deleteMany({ where: { gradingSystemId: gradingSystem.id } });
-
-        // Update main and create new related
-        return await tx.gradingSystem.update({
-          where: { id: gradingSystem.id },
-          data: {
-            passMark: data.passMark,
-            grades: {
-              create: mappedGrades,
-            },
-            assessments: {
-              create: data.assessments,
-            },
-            promotionCriteria: {
-              create: data.promotionCriteria,
-            },
-          },
-          include: {
-            grades: true,
-            assessments: true,
-            promotionCriteria: true,
-          },
-        });
-      });
+        },
+        {
+          timeout: 30000, // 30s transaction timeout
+        },
+      );
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
       console.error('Grading update error:', error);
-      throw new InternalServerErrorException('An unexpected error occurred while updating the grading system');
+      throw new InternalServerErrorException(
+        'An unexpected error occurred while updating the grading system',
+      );
     }
   }
 }
-

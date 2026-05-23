@@ -85,6 +85,7 @@ export class TeachersService {
       teacher.fullName,
       teacher.staffId,
       tempPassword,
+      school.name,
     );
 
     const { password, ...result } = teacher;
@@ -310,6 +311,7 @@ export class TeachersService {
 
     const teacher = await (this.prisma as any).teacher.findUnique({
       where: { id },
+      include: { school: { select: { name: true } } },
     });
 
     if (!teacher) {
@@ -328,6 +330,7 @@ export class TeachersService {
       teacher.email,
       teacher.fullName,
       dto.newPassword,
+      teacher.school?.name,
     );
 
     return { message: 'Password changed successfully' };

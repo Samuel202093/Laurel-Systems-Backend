@@ -103,7 +103,7 @@ export class StudentsController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SUPER_ADMIN', 'SCHOOL_OWNER', 'DIRECTOR', 'PRINCIPAL', 'ICT_ADMIN', 'SUB_ADMIN')
+  @Roles('SUPER_ADMIN', 'SCHOOL_OWNER', 'DIRECTOR', 'PRINCIPAL', 'ICT_ADMIN', 'SUB_ADMIN', 'TEACHER', 'STUDENT')
   @ApiOperation({ summary: 'Update a student' })
   async update(
     @Param('schoolId') schoolId: string,

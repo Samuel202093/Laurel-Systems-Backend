@@ -95,11 +95,6 @@ export class ResultsService {
 
   // ═══════════════════════════════════════════════════════════════════════
   //  UPLOAD / UPSERT RESULTS
-  //  - Each Result is unique per (school, class, classArm, subject, session, term)
-  //  - If the same teacher re-uploads → update scores, reset to PENDING
-  //  - If a DIFFERENT teacher tries to upload for the same combination:
-  //      • If the existing result is APPROVED → reject (must be revoked first)
-  //      • Otherwise → allow the new teacher to take ownership and update
   // ═══════════════════════════════════════════════════════════════════════
   async uploadResults(schoolId: string, teacherId: string, dto: UploadResultDto) {
     if (!teacherId) {
@@ -108,58 +103,42 @@ export class ResultsService {
 
     const { classId, classArmId, subjectId: subjectNameOrId, sessionId, termName, scores } = dto;
 
-    // 1. Resolve grading system (handles name resolution internally)
+    // 1. Resolve teacher and check permissions
+    const teacher = await (this.prisma as any).teacher.findUnique({
+      where: { id: teacherId },
+      select: { id: true, subjects: true, schoolId: true },
+    });
+
+    if (!teacher || teacher.schoolId !== schoolId) {
+      throw new ForbiddenException('Teacher not found or does not belong to this school.');
+    }
+
+    // 2. Resolve subject and verify teacher is assigned to it
+    const subject = await this.resolveSubject(this.prisma, schoolId, subjectNameOrId);
+    
+    // Check if teacher is assigned to this subject (either by ID or name)
+    const isAssignedToSubject = teacher.subjects.some(
+      (s: string) => s === subject.id || s === subject.name
+    );
+
+    if (!isAssignedToSubject) {
+      throw new ForbiddenException(`You are not assigned to the subject "${subject.name}".`);
+    }
+
+    // 3. Resolve grading system
     const gradingSystem = await this.gradingService.getGradingSystem(schoolId, sessionId, termName);
     if (!gradingSystem) {
       throw new BadRequestException(
-        `Grading system not set for session "${sessionId}" and term "${termName}". Please contact admin.`,
+        `Grading system not set for session "${sessionId}" and term "${termName}".`,
       );
     }
 
-    // Validate the teacher exists — the logged-in user might be a SchoolAdmin (ICT_ADMIN, etc.)
-    // who is not in the Teacher table. In that case, look them up via SchoolAdmin.
-    let resolvedTeacherId = teacherId;
-    const teacherExists = await (this.prisma as any).teacher.findFirst({
-      where: { id: teacherId, schoolId },
-      select: { id: true },
-    });
-
-    if (!teacherExists) {
-      // Try to find a Teacher record by matching the SchoolAdmin's email
-      const admin = await (this.prisma as any).schoolAdmin.findFirst({
-        where: { id: teacherId, schoolId },
-        select: { email: true },
-      });
-
-      if (admin) {
-        const teacherByEmail = await (this.prisma as any).teacher.findFirst({
-          where: { email: admin.email, schoolId },
-          select: { id: true },
-        });
-
-        if (teacherByEmail) {
-          resolvedTeacherId = teacherByEmail.id;
-        } else {
-          throw new BadRequestException(
-            'Your admin account does not have a linked Teacher profile. ' +
-            'Please ask an administrator to create a Teacher record for you, or log in with your Teacher account.',
-          );
-        }
-      } else {
-        throw new BadRequestException(
-          'Could not find your Teacher profile. Please ensure you are logged in correctly.',
-        );
-      }
-    }
-
     return await this.prisma.$transaction(async (tx) => {
-      // 2. Resolve names → UUIDs
       const session = await this.resolveSession(tx, schoolId, sessionId);
       const term = await this.resolveTerm(tx, session, termName);
-      const subject = await this.resolveSubject(tx, schoolId, subjectNameOrId);
       const finalTermId = term?.id || null;
 
-      // 3. Check for existing result (upsert logic)
+      // 4. Check for existing result
       let result = await (tx as any).result.findFirst({
         where: {
           schoolId,
@@ -174,29 +153,24 @@ export class ResultsService {
       let isUpdate = false;
 
       if (result) {
-        // ── Existing result found ──
         isUpdate = true;
-
-        // If it was uploaded by a DIFFERENT teacher and already APPROVED, block the overwrite
-        if (result.teacherId !== resolvedTeacherId && result.status === ResultStatus.APPROVED) {
+        // Only the original teacher or an admin can re-upload
+        if (result.teacherId !== teacherId && result.status === ResultStatus.APPROVED) {
           throw new ForbiddenException(
-            'This result has already been uploaded and approved by another teacher. ' +
-            'Contact admin to revoke approval before re-uploading.',
+            'This result is approved. Contact admin to revoke approval before re-uploading.',
           );
         }
 
-        // Update: reassign to current teacher, reset status to PENDING
         result = await (tx as any).result.update({
           where: { id: result.id },
           data: {
-            teacherId: resolvedTeacherId,
+            teacherId: teacherId,
             status: ResultStatus.PENDING,
             approvedById: null,
             rejectionReason: null,
           },
         });
       } else {
-        // ── Create new result record ──
         result = await (tx as any).result.create({
           data: {
             schoolId,
@@ -205,26 +179,15 @@ export class ResultsService {
             subjectId: subject.id,
             sessionId: session.id,
             termId: finalTermId,
-            teacherId: resolvedTeacherId,
+            teacherId: teacherId,
             status: ResultStatus.PENDING,
           },
         });
       }
 
-      // Guard: ensure result was created/updated successfully
-      if (!result || !result.id) {
-        throw new InternalServerErrorException(
-          'Failed to create or update the result record. Please try again.',
-        );
-      }
-
-      // 4. Process individual student scores with grading
+      // 5. Process individual student scores
       const studentScoreData = scores.map((s) => {
-        const totalScore = Object.values(s.assessmentScores).reduce(
-          (acc, curr) => acc + curr,
-          0,
-        );
-
+        const totalScore = Object.values(s.assessmentScores).reduce((acc, curr) => acc + curr, 0);
         const gradeLevel = gradingSystem.grades.find(
           (g) => totalScore >= g.minScore && totalScore <= g.maxScore,
         );
@@ -239,44 +202,82 @@ export class ResultsService {
         };
       });
 
-      // 5. Replace scores: delete old → insert new (idempotent)
       await (tx as any).studentScore.deleteMany({ where: { resultId: result.id } });
       await (tx as any).studentScore.createMany({ data: studentScoreData });
 
-      // 6. Re-fetch result with relations for the response
-      const fullResult = await (tx as any).result.findUnique({
-        where: { id: result.id },
-        include: {
-          subject: { select: { name: true, code: true } },
-          session: { select: { name: true } },
-          term: { select: { name: true } },
-          class: { select: { name: true } },
-          classArm: { select: { name: true } },
-          teacher: { select: { fullName: true } },
-          _count: { select: { scores: true } },
-        },
-      });
-
       return {
-        ...fullResult,
+        id: result.id,
         isUpdate,
+        status: result.status,
         studentsCount: studentScoreData.length,
       };
     });
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  //  TEACHER: Get my uploaded results (with status tracking)
+  //  VIEW RESULTS (Unified endpoint with permissions)
   // ═══════════════════════════════════════════════════════════════════════
-  async getTeacherResults(schoolId: string, teacherId: string) {
+  async getResults(schoolId: string, userId: string, roles: string[], filters: any) {
+    const { classId, classArmId, subjectId, sessionId, termName, status } = filters;
+
+    // 1. Determine user type and permissions
+    const adminRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'SCHOOL-ADMIN', 'SCHOOL_OWNER', 'DIRECTOR', 'PRINCIPAL', 'ICT_ADMIN', 'SUB_ADMIN', 'ADMIN'];
+    const isAdmin = roles.some(r => {
+      if (typeof r !== 'string') return false;
+      const normalized = r.toUpperCase().trim().replace(/[- ]/g, '_');
+      return adminRoles.some(ar => ar.replace(/[- ]/g, '_') === normalized);
+    });
+    
+    let teacher: any = null;
+    if (!isAdmin) {
+      teacher = await (this.prisma as any).teacher.findUnique({
+        where: { id: userId },
+        select: { id: true, formTeacherArms: true, subjects: true },
+      });
+    }
+
+    // 2. Build Prisma Query
+    const where: any = { schoolId };
+    if (classId) where.classId = classId;
+    if (classArmId) where.classArmId = classArmId;
+    if (subjectId) where.subjectId = subjectId;
+    if (status) where.status = status;
+
+    if (sessionId) {
+      const session = await (this.prisma as any).academicSession.findFirst({
+        where: { schoolId, OR: [{ id: sessionId }, { name: sessionId }] },
+      });
+      if (session) {
+        where.sessionId = session.id;
+        if (termName) {
+          const term = await (this.prisma as any).academicTerm.findFirst({
+            where: { sessionId: session.id, OR: [{ id: termName }, { name: termName }] },
+          });
+          if (term) where.termId = term.id;
+        }
+      }
+    }
+
+    // 3. Apply Permission Filters
+    if (!isAdmin && teacher) {
+      const isFormTeacher = teacher.formTeacherArms.includes(classArmId);
+      
+      if (!isFormTeacher) {
+        // If not a form teacher for this arm, can only see their own subjects
+        where.teacherId = teacher.id;
+      }
+      // If form teacher, they can see all subjects for their arm (handled by classArmId filter)
+    }
+
     return await (this.prisma as any).result.findMany({
-      where: { schoolId, teacherId },
+      where,
       include: {
         class: { select: { name: true } },
         classArm: { select: { name: true } },
         subject: { select: { name: true, code: true } },
         session: { select: { name: true } },
         term: { select: { name: true } },
+        teacher: { select: { fullName: true } },
         _count: { select: { scores: true } },
       },
       orderBy: { updatedAt: 'desc' },
@@ -284,15 +285,15 @@ export class ResultsService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  //  ADMIN: Get pending results for approval
+  //  GET SINGLE RESULT DETAIL
   // ═══════════════════════════════════════════════════════════════════════
-  async getPendingResults(schoolId: string) {
-    return await (this.prisma as any).result.findMany({
-      where: { schoolId, status: ResultStatus.PENDING },
+  async getResultDetail(schoolId: string, resultId: string, userId: string, roles: string[]) {
+    const result = await (this.prisma as any).result.findUnique({
+      where: { id: resultId },
       include: {
         class: { select: { name: true } },
         classArm: { select: { name: true } },
-        subject: { select: { name: true } },
+        subject: { select: { name: true, code: true } },
         session: { select: { name: true } },
         term: { select: { name: true } },
         teacher: { select: { fullName: true } },
@@ -300,11 +301,40 @@ export class ResultsService {
           include: {
             student: { select: { firstName: true, lastName: true, registrationNumber: true } },
           },
+          orderBy: { student: { lastName: 'asc' } },
         },
       },
-      orderBy: { createdAt: 'desc' },
     });
+
+    if (!result || result.schoolId !== schoolId) {
+      throw new NotFoundException('Result not found.');
+    }
+
+    // Permission Check
+    const adminRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'SCHOOL-ADMIN', 'SCHOOL_OWNER', 'DIRECTOR', 'PRINCIPAL', 'ICT_ADMIN', 'SUB_ADMIN', 'ADMIN'];
+    const isAdmin = roles.some(r => {
+      if (typeof r !== 'string') return false;
+      const normalized = r.toUpperCase().trim().replace(/[- ]/g, '_');
+      return adminRoles.some(ar => ar.replace(/[- ]/g, '_') === normalized);
+    });
+
+    if (!isAdmin) {
+      const teacher = await (this.prisma as any).teacher.findUnique({
+        where: { id: userId },
+        select: { id: true, formTeacherArms: true },
+      });
+
+      const isOwner = result.teacherId === userId;
+      const isFormTeacher = teacher?.formTeacherArms.includes(result.classArmId);
+
+      if (!isOwner && !isFormTeacher) {
+        throw new ForbiddenException('You do not have permission to view this result.');
+      }
+    }
+
+    return result;
   }
+
 
   // ═══════════════════════════════════════════════════════════════════════
   //  ADMIN: Approve or reject a result
@@ -410,14 +440,40 @@ export class ResultsService {
       const key = `${sessionName}___${termName}`;
 
       if (!resultSheet[key]) {
+        // Fetch grading system for this specific session/term for metadata
+        const gradingSystem = await this.gradingService.getGradingSystem(
+          schoolId,
+          score.result.sessionId,
+          score.result.termId || undefined,
+        );
+
         resultSheet[key] = {
           session: score.result.session,
           term: score.result.term,
           class: score.result.class,
           classArm: score.result.classArm,
+          gradingSystem: gradingSystem
+            ? {
+                passMark: gradingSystem.passMark,
+                grades: gradingSystem.grades,
+                assessments: gradingSystem.assessments,
+              }
+            : null,
           subjects: [],
+          summary: {
+            totalScore: 0,
+            averageScore: 0,
+            subjectsCount: 0,
+            passedCount: 0,
+            failedCount: 0,
+          },
         };
       }
+
+      const currentGradingSystem = resultSheet[key].gradingSystem;
+      const isPass = currentGradingSystem?.passMark
+        ? score.totalScore >= currentGradingSystem.passMark
+        : true;
 
       resultSheet[key].subjects.push({
         subject: score.result.subject,
@@ -425,8 +481,24 @@ export class ResultsService {
         totalScore: score.totalScore,
         grade: score.grade,
         remark: score.remark,
+        isPass,
       });
+
+      // Update summary
+      resultSheet[key].summary.totalScore += score.totalScore;
+      resultSheet[key].summary.subjectsCount += 1;
+      if (isPass) resultSheet[key].summary.passedCount += 1;
+      else resultSheet[key].summary.failedCount += 1;
     }
+
+    // Finalize summaries
+    Object.values(resultSheet).forEach((sheet: any) => {
+      if (sheet.summary.subjectsCount > 0) {
+        sheet.summary.averageScore = parseFloat(
+          (sheet.summary.totalScore / sheet.summary.subjectsCount).toFixed(2),
+        );
+      }
+    });
 
     return {
       student,

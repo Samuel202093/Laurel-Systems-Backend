@@ -14,26 +14,16 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     const pool = new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: {
-        rejectUnauthorized: false
+        rejectUnauthorized: false,
       },
-      max: 20, // Increase max connections
-      connectionTimeoutMillis: 60000, // Increase connection timeout to 60s for stability
-      idleTimeoutMillis: 30000, // Keep idle timeout at 30s
-      keepAlive: true, // Keep connection alive
-      statement_timeout: 60000, // Fail queries after 60s
-      query_timeout: 60000, // Fail queries after 60s
-    });
-
-    pool.on('connect', (client) => {
-      this.logger.debug('New client connected to the pool');
+      // When using Supabase's pgbouncer pooler, the pooler manages connections
+      // server-side — no need to cap max here. Keep timeouts generous.
+      connectionTimeoutMillis: 30000,
+      idleTimeoutMillis: 30000,
     });
 
     pool.on('error', (err) => {
       this.logger.error('Unexpected error on idle pg client', err.message);
-    });
-
-    pool.on('acquire', (client) => {
-      this.logger.debug('Client acquired from the pool');
     });
 
     const adapter = new PrismaPg(pool as any);
