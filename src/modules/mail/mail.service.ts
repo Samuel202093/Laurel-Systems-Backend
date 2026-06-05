@@ -9,20 +9,33 @@ export class MailService {
 
   constructor(private configService: ConfigService) {
     const mailHost = this.configService.get<string>('EMAIL_HOST');
-    const mailPort = this.configService.get<number>('EMAIL_PORT');
+    const mailPort = this.configService.get<string>('EMAIL_PORT');
     const mailUser = this.configService.get<string>('EMAIL_USER');
     const mailPassword = this.configService.get<string>('MAILER_PASSWORD');
 
     this.logger.log(`Initializing MailService with host: ${mailHost} and user: ${mailUser}`);
 
+    if (!mailHost || !mailUser || !mailPassword) {
+      this.logger.error(
+        'CRITICAL: Mail configuration is incomplete. Check EMAIL_HOST, EMAIL_USER, and MAILER_PASSWORD in .env',
+      );
+    }
+
+    const port = Number(mailPort) || 587;
+    const isSecure = port === 465; // true only for SSL; STARTTLS uses 587
+
     this.transporter = nodemailer.createTransport({
       host: mailHost,
-      port: mailPort,
-      secure: mailPort === 465, // true for 465, false for other ports (like 587)
-      // family: 4,
+      port,
+      secure: isSecure,
+      requireTLS: !isSecure, // Force STARTTLS upgrade on port 587
       auth: {
         user: mailUser,
         pass: mailPassword,
+      },
+      tls: {
+        // Do not fail on invalid certs
+        rejectUnauthorized: false,
       },
     });
 
@@ -108,6 +121,28 @@ export class MailService {
       this.logger.log(`Welcome email sent successfully to ${email}`);
     } catch (error) {
       this.logger.error(`Failed to send welcome email to ${email}`, error.stack);
+    }
+  }
+
+  async sendMail(to: string | string[], subject: string, html: string, schoolName?: string, bcc?: string | string[]) {
+    const finalSchoolName = schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
+    const senderEmail = this.configService.get<string>('EMAIL_USER');
+
+    this.logger.log(`Attempting to send email to: ${to} from: ${senderEmail} with subject: ${subject}`);
+
+    try {
+      const result = await this.transporter.sendMail({
+        from: `"${finalSchoolName}" <${senderEmail}>`,
+        to: Array.isArray(to) ? to.join(', ') : to,
+        bcc: Array.isArray(bcc) ? bcc.join(', ') : bcc,
+        subject,
+        html,
+      });
+      this.logger.log(`Email successfully sent to ${to}. MessageId: ${result.messageId}`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to send email to ${to}. Error: ${error.message}`, error.stack);
+      throw error;
     }
   }
 
@@ -448,5 +483,233 @@ export class MailService {
     this.logger.log(
       `Assignment notification dispatch completed for "${assignment.title}"`,
     );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  EXAM RESULTS — compiled class summary email to teacher
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Send a compiled, ranked exam results table to the teacher after students submit.
+   * Can be triggered automatically after each submission or manually via the API.
+   */
+  async sendExamClassResultsToTeacher(payload: {
+    teacher: { fullName: string; email: string };
+    exam: {
+      title: string;
+      totalMarks: number;
+      term: string;
+      subject: { name: string } | null;
+      class: { name: string } | null;
+    };
+    attempts: Array<{
+      studentName: string;
+      registrationNumber: string;
+      score: number;
+      percentage: number;
+      submittedAt: Date | null;
+    }>;
+    school: { name: string; shortName: string | null };
+  }) {
+    const { teacher, exam, attempts, school } = payload;
+    const senderEmail = this.configService.get<string>('EMAIL_USER');
+    const schoolDisplay = school.shortName || school.name;
+    const year = new Date().getFullYear();
+
+    // Summary stats
+    const totalStudents = attempts.length;
+    const totalScore = attempts.reduce((sum, a) => sum + a.score, 0);
+    const avgScore = totalStudents > 0 ? (totalScore / totalStudents).toFixed(2) : '0.00';
+    const highestScore = totalStudents > 0 ? Math.max(...attempts.map((a) => a.score)) : 0;
+    const lowestScore = totalStudents > 0 ? Math.min(...attempts.map((a) => a.score)) : 0;
+    const passed = attempts.filter((a) => a.percentage >= 50).length;
+
+    // Build ranked table rows
+    const tableRows = attempts
+      .map((a, idx) => {
+        const passFail = a.percentage >= 50;
+        const bgColor = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+        const badge = passFail
+          ? `<span style="color:#065f46;background:#d1fae5;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;">PASS</span>`
+          : `<span style="color:#991b1b;background:#fee2e2;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;">FAIL</span>`;
+        const formattedDate = a.submittedAt
+          ? new Date(a.submittedAt).toLocaleString('en-GB', {
+              day: '2-digit', month: 'short', year: 'numeric',
+              hour: '2-digit', minute: '2-digit',
+            })
+          : '—';
+        return `
+          <tr style="background:${bgColor};">
+            <td style="padding:10px 14px;font-size:13px;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;">${idx + 1}</td>
+            <td style="padding:10px 14px;font-size:13px;color:#111827;border-bottom:1px solid #e5e7eb;">${a.studentName}</td>
+            <td style="padding:10px 14px;font-size:12px;color:#6b7280;border-bottom:1px solid #e5e7eb;">${a.registrationNumber}</td>
+            <td style="padding:10px 14px;font-size:13px;font-weight:700;color:#1e40af;border-bottom:1px solid #e5e7eb;">${a.score} / ${exam.totalMarks}</td>
+            <td style="padding:10px 14px;font-size:13px;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;">${a.percentage}%</td>
+            <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;">${badge}</td>
+            <td style="padding:10px 14px;font-size:12px;color:#6b7280;border-bottom:1px solid #e5e7eb;">${formattedDate}</td>
+          </tr>`;
+      })
+      .join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Exam Results — ${exam.title}</title>
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#334155;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="680" cellpadding="0" cellspacing="0"
+               style="max-width:680px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#1d4ed8 0%,#3b82f6 100%);padding:32px 36px;text-align:center;">
+              <h1 style="margin:0 0 6px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-.3px;">
+                📊 Exam Results Summary
+              </h1>
+              <p style="margin:0 0 4px;font-size:14px;color:rgba(255,255,255,.9);">${school.name}</p>
+              <p style="margin:0;font-size:12px;color:rgba(255,255,255,.7);">Compiled result sheet for your review</p>
+            </td>
+          </tr>
+
+          <!-- Exam Meta -->
+          <tr>
+            <td style="background:#eff6ff;border-bottom:1px solid #bfdbfe;padding:20px 36px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="width:50%;padding-right:16px;">
+                    <p style="margin:0 0 6px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;">Exam Title</p>
+                    <p style="margin:0;font-size:15px;font-weight:700;color:#1e3a8a;">${exam.title}</p>
+                  </td>
+                  <td style="width:50%;padding-left:16px;">
+                    <p style="margin:0 0 6px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;">Subject</p>
+                    <p style="margin:0;font-size:15px;font-weight:600;color:#1e40af;">${exam.subject?.name ?? '—'}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding-top:14px;padding-right:16px;">
+                    <p style="margin:0 0 6px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;">Class</p>
+                    <p style="margin:0;font-size:14px;color:#374151;">${exam.class?.name ?? '—'}</p>
+                  </td>
+                  <td style="padding-top:14px;padding-left:16px;">
+                    <p style="margin:0 0 6px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;">Term</p>
+                    <p style="margin:0;font-size:14px;color:#374151;">${exam.term}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Stats Cards -->
+          <tr>
+            <td style="padding:24px 36px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td width="20%" style="text-align:center;padding:0 4px;">
+                    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px 8px;">
+                      <p style="margin:0 0 4px;font-size:22px;font-weight:800;color:#16a34a;">${totalStudents}</p>
+                      <p style="margin:0;font-size:11px;color:#4b5563;font-weight:600;">Submitted</p>
+                    </div>
+                  </td>
+                  <td width="20%" style="text-align:center;padding:0 4px;">
+                    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:16px 8px;">
+                      <p style="margin:0 0 4px;font-size:22px;font-weight:800;color:#1d4ed8;">${avgScore}</p>
+                      <p style="margin:0;font-size:11px;color:#4b5563;font-weight:600;">Avg Score</p>
+                    </div>
+                  </td>
+                  <td width="20%" style="text-align:center;padding:0 4px;">
+                    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:16px 8px;">
+                      <p style="margin:0 0 4px;font-size:22px;font-weight:800;color:#ea580c;">${highestScore}</p>
+                      <p style="margin:0;font-size:11px;color:#4b5563;font-weight:600;">Highest</p>
+                    </div>
+                  </td>
+                  <td width="20%" style="text-align:center;padding:0 4px;">
+                    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:16px 8px;">
+                      <p style="margin:0 0 4px;font-size:22px;font-weight:800;color:#dc2626;">${lowestScore}</p>
+                      <p style="margin:0;font-size:11px;color:#4b5563;font-weight:600;">Lowest</p>
+                    </div>
+                  </td>
+                  <td width="20%" style="text-align:center;padding:0 4px;">
+                    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px 8px;">
+                      <p style="margin:0 0 4px;font-size:22px;font-weight:800;color:#15803d;">${passed}</p>
+                      <p style="margin:0;font-size:11px;color:#4b5563;font-weight:600;">Passed</p>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Greeting -->
+          <tr>
+            <td style="padding:0 36px 16px;">
+              <p style="margin:0;font-size:15px;color:#374151;">
+                Dear <strong>${teacher.fullName}</strong>,<br/>
+                Below is the ranked result sheet for <strong>${exam.title}</strong>.
+                A total of <strong>${totalStudents}</strong> student(s) have submitted their answers.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Results Table -->
+          <tr>
+            <td style="padding:0 36px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0"
+                     style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+                <thead>
+                  <tr style="background:#1d4ed8;">
+                    <th style="padding:12px 14px;text-align:left;font-size:12px;font-weight:600;color:#e0e7ff;text-transform:uppercase;letter-spacing:.4px;">#</th>
+                    <th style="padding:12px 14px;text-align:left;font-size:12px;font-weight:600;color:#e0e7ff;text-transform:uppercase;letter-spacing:.4px;">Student Name</th>
+                    <th style="padding:12px 14px;text-align:left;font-size:12px;font-weight:600;color:#e0e7ff;text-transform:uppercase;letter-spacing:.4px;">Reg. No.</th>
+                    <th style="padding:12px 14px;text-align:left;font-size:12px;font-weight:600;color:#e0e7ff;text-transform:uppercase;letter-spacing:.4px;">Score</th>
+                    <th style="padding:12px 14px;text-align:left;font-size:12px;font-weight:600;color:#e0e7ff;text-transform:uppercase;letter-spacing:.4px;">%</th>
+                    <th style="padding:12px 14px;text-align:left;font-size:12px;font-weight:600;color:#e0e7ff;text-transform:uppercase;letter-spacing:.4px;">Status</th>
+                    <th style="padding:12px 14px;text-align:left;font-size:12px;font-weight:600;color:#e0e7ff;text-transform:uppercase;letter-spacing:.4px;">Submitted At</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${tableRows}
+                </tbody>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:24px 36px;text-align:center;">
+              <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#475569;">${school.name}</p>
+              <p style="margin:0 0 12px;font-size:12px;color:#94a3b8;">This is an automated results summary from your school portal.</p>
+              <p style="margin:0;font-size:11px;color:#cbd5e1;">© ${year} ${school.name}. All rights reserved.</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    try {
+      await this.transporter.sendMail({
+        from: `"${schoolDisplay}" <${senderEmail}>`,
+        to: teacher.email,
+        subject: `📊 Exam Results: ${exam.title} — ${exam.class?.name ?? ''} | ${schoolDisplay}`,
+        html,
+      });
+      this.logger.log(
+        `Exam class results email sent to ${teacher.email} for "${exam.title}" (${totalStudents} students)`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send exam results email to ${teacher.email}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 }

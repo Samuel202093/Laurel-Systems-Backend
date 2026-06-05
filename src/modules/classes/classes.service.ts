@@ -199,9 +199,10 @@ export class ClassesService {
     });
   }
 
-  async saveClassSetup(schoolId: string, dto: ClassSetupDto) {
+  async saveClassSetup(schoolId: string, dto: ClassSetupDto, tx?: any) {
     // Check if school exists
-    const school = await (this.prisma as any).school.findUnique({
+    const prisma = tx || this.prisma;
+    const school = await (prisma as any).school.findUnique({
       where: { id: schoolId },
     });
 
@@ -209,10 +210,10 @@ export class ClassesService {
       throw new NotFoundException(`School with ID ${schoolId} not found`);
     }
 
-    // Use a transaction to update setup and populate classes/arms
-    return (this.prisma as any).$transaction(async (tx: any) => {
+    // Define the core logic
+    const execute = async (client: any) => {
       // 1. Upsert the class setup config
-      const setup = await tx.classSetup.upsert({
+      const setup = await client.classSetup.upsert({
         where: { schoolId },
         update: {
           config: dto as any,
@@ -224,7 +225,7 @@ export class ClassesService {
       });
 
       // 2. Clear existing classes and arms for this school to rebuild from setup
-      await tx.class.deleteMany({
+      await client.class.deleteMany({
         where: { schoolId },
       });
 
@@ -242,13 +243,13 @@ export class ClassesService {
 
       // 4. Create all classes and arms efficiently
       for (const data of classData) {
-        const newClass = await tx.class.create({
+        const newClass = await client.class.create({
           data,
         });
 
         // Create arms if applicable
         if (dto.classArm.hasArms && dto.classArm.arms && dto.classArm.arms.length > 0) {
-          await tx.classArm.createMany({
+          await client.classArm.createMany({
             data: dto.classArm.arms.map((armName: string) => ({
               name: armName,
               classId: newClass.id,
@@ -258,7 +259,13 @@ export class ClassesService {
       }
 
       return setup;
-    }, {
+    };
+
+    // Use existing transaction if provided, otherwise start a new one
+    if (tx) {
+      return execute(tx);
+    }
+    return (this.prisma as any).$transaction(execute, {
       timeout: 15000 // Increase timeout to 15 seconds for bulk operations
     });
   }

@@ -14,6 +14,18 @@ export class QuestionOptionDto {
 
   @IsString()
   text: string;
+
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  imagePublicId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  hasImage?: boolean;
 }
 
 export class CreateQuestionDto {

@@ -21,6 +21,47 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 
+// ─── Helper: build a uniform JSON envelope with school name at top level ───────
+/**
+ * Promotes `schoolName` from the nested `data.schoolInfo.name` (or `data.school.name`)
+ * to the top level of the response, and prepends it to the human-readable message.
+ * This ensures the school's name is always immediately visible in every API response.
+ */
+function envelope(
+  res: Response,
+  status: HttpStatus,
+  message: string,
+  data: any,
+) {
+  const schoolName: string | undefined =
+    data?.schoolInfo?.name ?? data?.school?.name ?? undefined;
+
+  const finalMessage = schoolName
+    ? `${schoolName} — ${message}`
+    : message;
+
+  return res.status(status).json({
+    statusCode: status,
+    ...(schoolName ? { schoolName } : {}),
+    message: finalMessage,
+    data,
+  });
+}
+
+/** Extract and de-duplicate roles from the JWT payload (handles role/subRole/roles fields). */
+function extractRoles(user: any): string[] {
+  const rawRoles = user.roles;
+  const fromPayload = Array.isArray(rawRoles)
+    ? rawRoles
+    : typeof rawRoles === 'string' ? [rawRoles] : [];
+
+  return Array.from(new Set([
+    ...fromPayload,
+    ...(user.role ? [user.role] : []),
+    ...(user.subRole ? [user.subRole] : []),
+  ]));
+}
+
 @ApiTags('Results')
 @ApiBearerAuth()
 @Controller('results/:schoolId')
@@ -30,7 +71,7 @@ export class ResultsController {
 
   // ─── Unified Search Results (Dynamic Permissions) ──────────────────
   @Get()
-  @Roles('TEACHER', 'ICT_ADMIN', 'DIRECTOR', 'PRINCIPAL', 'SCHOOL_OWNER', 'SCHOOL_ADMIN' )
+  @Roles('TEACHER', 'SCHOOL_ADMIN', 'ICT_ADMIN', 'DIRECTOR', 'PRINCIPAL', 'SCHOOL_OWNER', 'SCHOOL_ADMIN')
   @ApiOperation({ summary: 'Search results with dynamic permissions (Teacher: own subjects/form-arm, Admin: all)' })
   async getResults(
     @Param('schoolId') schoolId: string,
@@ -39,29 +80,14 @@ export class ResultsController {
     @Res() res: Response,
   ) {
     const userId = req.user.sub || req.user.id;
-    // Robustly extract all roles: support role, subRole, and roles[] from JWT payload
-    const rawRoles = req.user.roles;
-    const rolesFromPayload = Array.isArray(rawRoles)
-      ? rawRoles
-      : (typeof rawRoles === 'string' ? [rawRoles] : []);
-
-    const roles = Array.from(new Set([
-      ...rolesFromPayload,
-      ...(req.user.role ? [req.user.role] : []),
-      ...(req.user.subRole ? [req.user.subRole] : []),
-    ]));
-
+    const roles = extractRoles(req.user);
     const data = await this.resultsService.getResults(schoolId, userId, roles, filters);
-    return res.status(HttpStatus.OK).json({
-      statusCode: HttpStatus.OK,
-      message: 'Results retrieved successfully.',
-      data,
-    });
+    return envelope(res, HttpStatus.OK, 'Results retrieved successfully.', data);
   }
 
   // ─── Get Single Result Detail ──────────────────────────────────────
   @Get(':resultId')
-  @Roles('TEACHER', 'ICT_ADMIN', 'DIRECTOR', 'PRINCIPAL', 'SCHOOL_OWNER', 'SCHOOL_ADMIN')
+  @Roles('TEACHER', 'SCHOOL_ADMIN', 'ICT_ADMIN', 'DIRECTOR', 'PRINCIPAL', 'SCHOOL_OWNER', 'SCHOOL_ADMIN')
   @ApiOperation({ summary: 'Retrieve single result detail (with permission checks)' })
   async getResultDetail(
     @Param('schoolId') schoolId: string,
@@ -70,29 +96,14 @@ export class ResultsController {
     @Res() res: Response,
   ) {
     const userId = req.user.sub || req.user.id;
-    // Robustly extract all roles: support role, subRole, and roles[] from JWT payload
-    const rawRoles = req.user.roles;
-    const rolesFromPayload = Array.isArray(rawRoles)
-      ? rawRoles
-      : (typeof rawRoles === 'string' ? [rawRoles] : []);
-
-    const roles = Array.from(new Set([
-      ...rolesFromPayload,
-      ...(req.user.role ? [req.user.role] : []),
-      ...(req.user.subRole ? [req.user.subRole] : []),
-    ]));
-
+    const roles = extractRoles(req.user);
     const data = await this.resultsService.getResultDetail(schoolId, resultId, userId, roles);
-    return res.status(HttpStatus.OK).json({
-      statusCode: HttpStatus.OK,
-      message: 'Result details retrieved successfully.',
-      data,
-    });
+    return envelope(res, HttpStatus.OK, 'Result details retrieved successfully.', data);
   }
 
   // ─── Teacher uploads / re-uploads results for a subject ─────────────
   @Post('upload')
-  @Roles('TEACHER', 'ICT_ADMIN', 'DIRECTOR', 'PRINCIPAL', 'SCHOOL_OWNER')
+  @Roles('TEACHER', 'SCHOOL_ADMIN', 'ICT_ADMIN', 'DIRECTOR', 'PRINCIPAL', 'SCHOOL_OWNER')
   @ApiOperation({ summary: 'Upload or update results for a specific class, arm, and subject' })
   @ApiParam({ name: 'schoolId', description: 'The unique ID of the school' })
   async uploadResults(
@@ -108,16 +119,17 @@ export class ResultsController {
       ? 'Results updated successfully and awaiting re-approval.'
       : 'Results uploaded successfully and awaiting approval.';
 
-    return res.status(data.isUpdate ? HttpStatus.OK : HttpStatus.CREATED).json({
-      statusCode: data.isUpdate ? HttpStatus.OK : HttpStatus.CREATED,
+    return envelope(
+      res,
+      data.isUpdate ? HttpStatus.OK : HttpStatus.CREATED,
       message,
       data,
-    });
+    );
   }
 
   // ─── Admin: Approve or reject a result ──────────────────────────────
   @Patch(':resultId/approve')
-  @Roles('ICT_ADMIN', 'DIRECTOR', 'PRINCIPAL', 'SCHOOL_OWNER', 'SCHOOL_ADMIN')
+  @Roles('SCHOOL_ADMIN', 'ICT_ADMIN', 'DIRECTOR', 'PRINCIPAL', 'SCHOOL_OWNER')
   @ApiOperation({ summary: 'Approve or Reject a set of results' })
   @ApiParam({ name: 'resultId', description: 'The unique ID of the result record' })
   async approveResult(
@@ -130,16 +142,12 @@ export class ResultsController {
     const approvedById = req.user.sub || req.user.id;
     const data = await this.resultsService.approveResult(schoolId, resultId, approvedById, dto);
     const message = dto.status === 'APPROVED' ? 'Results approved successfully.' : 'Results rejected.';
-    return res.status(HttpStatus.OK).json({
-      statusCode: HttpStatus.OK,
-      message,
-      data,
-    });
+    return envelope(res, HttpStatus.OK, message, data);
   }
 
   // ─── Student / Parent / Admin: View approved results by student ID ──
   @Get('student/:studentId')
-  @Roles('STUDENT', 'PARENT', 'TEACHER', 'ICT_ADMIN', 'DIRECTOR', 'PRINCIPAL', 'SCHOOL_OWNER', 'SCHOOL_ADMIN')
+  @Roles('STUDENT', 'PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'ICT_ADMIN', 'DIRECTOR', 'PRINCIPAL', 'SCHOOL_OWNER')
   @ApiOperation({ summary: 'Retrieve approved result sheet for a student' })
   @ApiQuery({ name: 'sessionName', required: false, description: 'Session name e.g. "2025/2026"' })
   @ApiQuery({ name: 'termName', required: false, description: 'Term name e.g. "First Term"' })
@@ -151,15 +159,11 @@ export class ResultsController {
     @Res() res: Response,
   ) {
     const data = await this.resultsService.getStudentResults(schoolId, studentId, sessionName, termName);
-    return res.status(HttpStatus.OK).json({
-      statusCode: HttpStatus.OK,
-      message: 'Student results retrieved successfully.',
-      data,
-    });
+    return envelope(res, HttpStatus.OK, 'Student results retrieved successfully.', data);
   }
 
   @Get('student/:studentId/print')
-  @Roles('STUDENT', 'PARENT', 'TEACHER', 'ICT_ADMIN', 'DIRECTOR', 'PRINCIPAL', 'SCHOOL_OWNER', 'SCHOOL_ADMIN')
+  @Roles('STUDENT', 'PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'ICT_ADMIN', 'DIRECTOR', 'PRINCIPAL', 'SCHOOL_OWNER')
   @ApiOperation({ summary: 'Retrieve print-ready approved result sheet for a student' })
   @ApiQuery({ name: 'sessionName', required: true, description: 'Session name e.g. "2025/2026"' })
   @ApiQuery({ name: 'termName', required: true, description: 'Term name e.g. "First Term"' })
@@ -178,32 +182,27 @@ export class ResultsController {
     }
 
     const data = await this.resultsService.getStudentResults(schoolId, studentId, sessionName, termName);
-    
-    // The service already groups by session/term. For a single printout, 
-    // we usually want exactly one term's data.
+
     const specificResult = data.results.find(
-      (r: any) => 
-        (r.session.name === sessionName || r.session.id === sessionName) && 
-        (r.term?.name === termName || r.term?.id === termName)
+      (r: any) =>
+        (r.session.name === sessionName || r.session.id === sessionName) &&
+        (r.term?.name === termName || r.term?.id === termName),
     );
 
     if (!specificResult) {
       throw new NotFoundException(`No approved results found for student in ${sessionName} - ${termName}`);
     }
 
-    return res.status(HttpStatus.OK).json({
-      statusCode: HttpStatus.OK,
-      message: 'Printable results retrieved successfully.',
-      data: {
-        student: data.student,
-        result: specificResult,
-      },
+    return envelope(res, HttpStatus.OK, 'Printable results retrieved successfully.', {
+      schoolInfo: data.schoolInfo,
+      student: data.student,
+      result: specificResult,
     });
   }
 
   // ─── Parent: Look up child's results by registration number ─────────
   @Get('parent/student-results')
-  @Roles('PARENT', 'TEACHER', 'ICT_ADMIN', 'DIRECTOR', 'PRINCIPAL', 'SCHOOL_OWNER', 'SCHOOL_ADMIN')
+  @Roles('PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'ICT_ADMIN', 'DIRECTOR', 'PRINCIPAL', 'SCHOOL_OWNER')
   @ApiOperation({ summary: 'Parent retrieves approved results by student registration number' })
   @ApiQuery({ name: 'regNo', required: true, description: 'Student registration number' })
   @ApiQuery({ name: 'sessionName', required: false, description: 'Session name e.g. "2025/2026"' })
@@ -222,16 +221,12 @@ export class ResultsController {
       });
     }
     const data = await this.resultsService.getStudentResultsByRegNo(schoolId, regNo, sessionName, termName);
-    return res.status(HttpStatus.OK).json({
-      statusCode: HttpStatus.OK,
-      message: 'Student results retrieved successfully.',
-      data,
-    });
+    return envelope(res, HttpStatus.OK, 'Student results retrieved successfully.', data);
   }
 
   // ─── Admin / Teacher: View approved results for a class arm ─────────
   @Get('class/sheet')
-  @Roles('TEACHER', 'ICT_ADMIN', 'DIRECTOR', 'PRINCIPAL', 'SCHOOL_OWNER')
+  @Roles('TEACHER', 'SCHOOL_ADMIN', 'ICT_ADMIN', 'DIRECTOR', 'PRINCIPAL', 'SCHOOL_OWNER')
   @ApiOperation({ summary: 'Retrieve approved results for a class arm' })
   @ApiQuery({ name: 'classId', required: true })
   @ApiQuery({ name: 'classArmId', required: true })
@@ -246,10 +241,6 @@ export class ResultsController {
     @Res() res: Response,
   ) {
     const data = await this.resultsService.getClassResults(schoolId, classId, classArmId, sessionName, termName);
-    return res.status(HttpStatus.OK).json({
-      statusCode: HttpStatus.OK,
-      message: 'Class results retrieved successfully.',
-      data,
-    });
+    return envelope(res, HttpStatus.OK, 'Class results retrieved successfully.', data);
   }
 }

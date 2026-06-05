@@ -33,6 +33,7 @@ model School {
   transactions            Transaction[]
   platformConfigs         PlatformConfig[]
   platformPayouts         PlatformPayout[]
+  communications          Communication[]
   paystackSubaccountCode  String?
   flutterwaveSubaccountId String?
   absorbGatewayFee        Boolean            @default(false)
@@ -503,6 +504,23 @@ model Question {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   exam          Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+}
+
+model Communication {
+  id            String   @id @default(uuid())
+  schoolId      String
+  subject       String
+  message       String
+  recipientType String // 'staff', 'parents', 'both', 'custom'
+  recipients    String[]
+  status        String // 'sent', 'failed'
+  error         String?
+  fileUrl       String?
+  filePublicId  String?
+  timestamp     DateTime @default(now())
+  school        School   @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId])
 }
 
 model Assignment {

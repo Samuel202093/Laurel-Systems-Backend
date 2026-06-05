@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateSchoolDto } from './dto/create-school.dto';
 import { OtpService } from '../auth/otp.service';
@@ -7,6 +7,8 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class SchoolsService {
+  private readonly logger = new Logger(SchoolsService.name);
+
   constructor(
     private prisma: PrismaService,
     private otpService: OtpService,
@@ -29,7 +31,7 @@ export class SchoolsService {
   async registerSchool(dto: CreateSchoolDto) {
     
     // 1. Verify OTP first
-    // await this.otpService.verifyOtp(dto.email, dto.otpCode);
+    await this.otpService.verifyOtp(dto.email, dto.otpCode);
 
     // 2. Check if user already exists
     const existingUser = await (this.prisma as any).schoolAdmin.findUnique({
@@ -81,7 +83,7 @@ export class SchoolsService {
         const classSetup = onboardingData.classLevel ? onboardingData : onboardingData.classSetup;
         
         if (classSetup && classSetup.classLevel) {
-          await this.classesService.saveClassSetup(school.id, classSetup);
+          await this.classesService.saveClassSetup(school.id, classSetup, tx);
         }
       }
 
@@ -131,17 +133,13 @@ export class SchoolsService {
 
   // Multi-step onboarding progress tracking
   async saveOnboardingProgress(email: string, step: number, data: any) {
+    this.logger.log(`Saving onboarding progress for ${email} at step ${step}`);
+    
     const progress = await (this.prisma as any).onboardingProgress.upsert({
       where: { email },
       update: { step, data },
       create: { email, step, data },
     });
-
-    // If entering Step 2 (About You), automatically trigger OTP send
-    if (step === 2) {
-      const otpInfo = await this.otpService.sendOtp(email);
-      return { ...progress, otpInfo };
-    }
 
     return progress;
   }
@@ -159,6 +157,11 @@ export class SchoolsService {
   }
 
   async clearOnboardingProgress(email: string) {
+    // Also clear OTPs for this email
+    await (this.prisma as any).otp.deleteMany({
+      where: { email },
+    }).catch(() => null);
+
     return (this.prisma as any).onboardingProgress.delete({
       where: { email },
     }).catch(() => null); // Ignore if not found

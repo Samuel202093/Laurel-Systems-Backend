@@ -1,29 +1,24 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
-import * as nodemailer from 'nodemailer';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class OtpService {
-  private transporter: nodemailer.Transporter;
+  private readonly logger = new Logger(OtpService.name);
 
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
-  ) {
-    this.transporter = nodemailer.createTransport({
-      host: this.configService.get<string>('EMAIL_HOST'),
-      port: this.configService.get<number>('EMAIL_PORT'),
-      auth: {
-        user: this.configService.get<string>('EMAIL_USER'),
-        pass: this.configService.get<string>('MAILER_PASSWORD'),
-      },
-    });
-  }
+    private mailService: MailService,
+  ) {}
 
   async sendOtp(email: string) {
     const code = Math.floor(10000 + Math.random() * 90000).toString(); // 5-digit code
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Remove any existing OTPs for this email before creating a fresh one
+    await this.prisma.otp.deleteMany({ where: { email } }).catch(() => null);
 
     await this.prisma.otp.create({
       data: {
@@ -34,29 +29,34 @@ export class OtpService {
     });
 
     // For development, log the code.
-    console.log(`OTP for ${email}: ${code}`);
+    this.logger.log(`OTP generated for ${email}: ${code}`);
 
     try {
       const schoolName = this.configService.get<string>('SCHOOL_NAME', 'School Management');
-      await this.transporter.sendMail({
-        from: `"${schoolName}" <${this.configService.get<string>('EMAIL_USER')}>`,
-        to: email,
-        subject: `Your ${schoolName} Onboarding Verification Code`,
-        html: `
-          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-            <h2 style="color: #0891b2;">Verify Your Email</h2>
-            <p>Thank you for starting your ${schoolName} onboarding. Use the code below to verify your email address:</p>
-            <div style="background: #f3f4f6; padding: 15px; font-size: 24px; font-weight: bold; text-align: center; border-radius: 8px; margin: 20px 0;">
-              ${code}
+      const subject = `Your ${schoolName} Onboarding Verification Code`;
+      const html = `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 10px;">
+            <div style="background-color: #0891b2; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+              <h2 style="margin: 0;">Verify Your Email</h2>
             </div>
-            <p>This code will expire in 10 minutes.</p>
-            <p>If you didn't request this, please ignore this email.</p>
+            <div style="padding: 30px; background-color: #ffffff;">
+              <p>Thank you for starting your <strong>${schoolName}</strong> onboarding. Use the code below to verify your email address:</p>
+              <div style="background: #f3f4f6; padding: 20px; font-size: 32px; font-weight: bold; text-align: center; border-radius: 8px; margin: 30px 0; color: #0891b2; letter-spacing: 5px;">
+                ${code}
+              </div>
+              <p>This code will expire in <strong>10 minutes</strong>.</p>
+              <p style="color: #666; font-size: 14px; margin-top: 30px;">If you didn't request this, please ignore this email.</p>
+            </div>
+            <div style="text-align: center; padding: 20px; font-size: 12px; color: #777; background-color: #f9fafb; border-radius: 0 0 10px 10px;">
+              <p>&copy; ${new Date().getFullYear()} ${schoolName}. All rights reserved.</p>
+            </div>
           </div>
-        `,
-      });
-      console.log(`Email successfully sent to ${email}`);
+        `;
+
+      await this.mailService.sendMail(email, subject, html, schoolName);
+      this.logger.log(`OTP email successfully sent to ${email}`);
     } catch (error) {
-      console.error('Failed to send email:', error);
+      this.logger.error(`Failed to send OTP email to ${email}:`, error.stack);
       throw new BadRequestException(`Failed to send verification email: ${error.message}`);
     }
 
@@ -82,9 +82,10 @@ export class OtpService {
       throw new BadRequestException('Invalid or expired OTP');
     }
 
-    // Delete the OTP after successful verification
-    await this.prisma.otp.delete({ where: { id: otp.id } });
-
+    // Instead of deleting, just return true. 
+    // The registration endpoint will call clearOnboardingProgress which should handle cleanup.
+    // Or we can mark it as verified if you have a field for that.
+    
     return true;
   }
 }

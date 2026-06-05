@@ -23,6 +23,7 @@ import { FeesModule } from './modules/fees/fees.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { PlatformConfigModule } from './modules/platform-config/platform-config.module';
 import { PlatformPayoutModule } from './modules/platform-payout/platform-payout.module';
+import { CommunicationModule } from './modules/communication/communication.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { PlatformPayoutModule } from './modules/platform-payout/platform-payout.
     PaymentsModule,
     PlatformConfigModule,
     PlatformPayoutModule,
+    CommunicationModule,
   ],
   controllers: [AppController],
   providers: [AppService],
