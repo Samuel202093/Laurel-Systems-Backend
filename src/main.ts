@@ -6,11 +6,19 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Set global prefix
-  app.setGlobalPrefix('api/v1');
 
   // Enable CORS
-  app.enableCors();
+  app.enableCors({
+    origin: [
+      'https://laurel-school.netlify.app',
+      'http://localhost:3000',
+    ],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    credentials: true,
+  });
+
+  // Set global prefix
+  app.setGlobalPrefix('api/v1');
 
   // Use global validation pipe
   app.useGlobalPipes(
