@@ -34,4 +34,7 @@
     "**/*.spec.ts",
     "prisma.config.ts"
   ],
+  "ts-node": {
+  "require": ["tsconfig-paths/register"]
+}
 }
