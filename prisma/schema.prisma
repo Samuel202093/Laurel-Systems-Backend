@@ -17,33 +17,41 @@ model School {
   website                 String?
   createdAt               DateTime           @default(now())
   updatedAt               DateTime           @updatedAt
+  absorbGatewayFee        Boolean            @default(false)
+  flutterwaveSubaccountId String?
+  paystackSubaccountCode  String?
+  currency                String             @default("NGN")
+  emailAlerts             Boolean            @default(true)
+  geofencingRadius        Int?               @default(100)
+  latitude                Decimal?           @db.Decimal(10, 8)
+  logo                    String?
+  logoPublicId            String?
+  longitude               Decimal?           @db.Decimal(11, 8)
+  publicationMode         String             @default("auto")
+  smsAlerts               Boolean            @default(false)
   academicSessions        AcademicSession[]
   assignments             Assignment[]
   bankAccounts            BankAccount[]
   classes                 Class[]
   classSetup              ClassSetup?
+  communications          Communication[]
   exams                   Exam[]
-  gradingSystem           GradingSystem[]
   feeConfigurations       FeeConfiguration[]
+  gradingSystem           GradingSystem[]
+  platformConfigs         PlatformConfig[]
+  platformPayouts         PlatformPayout[]
   results                 Result[]
   schoolAdmins            SchoolAdmin[]
   students                Student[]
   subjects                Subject[]
   teachers                Teacher[]
   transactions            Transaction[]
-  platformConfigs         PlatformConfig[]
-  platformPayouts         PlatformPayout[]
-  communications          Communication[]
-  paystackSubaccountCode  String?
-  flutterwaveSubaccountId String?
-  absorbGatewayFee        Boolean            @default(false)
 }
 
 model FeeConfiguration {
   id                String          @id @default(uuid())
   schoolId          String
   feeName           String
-  feeCategory       String[]
   session           String
   term              String
   amount            Decimal         @db.Decimal(15, 2)
@@ -53,10 +61,11 @@ model FeeConfiguration {
   paymentPlan       String          @default("full")
   installments      Int?
   notes             String?
-  bankAccountIds    String[]
   isActive          Boolean         @default(true)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+  bankAccountIds    String[]
+  feeCategory       String[]
   school            School          @relation(fields: [schoolId], references: [id])
   paymentRecords    PaymentRecord[]
 
@@ -72,9 +81,9 @@ model SuperAdmin {
   email     String   @unique
   password  String
   phone     String?
-  roles     String[] @default(["SUPER_ADMIN"])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  roles     String[] @default(["SUPER_ADMIN"])
 }
 
 model SchoolAdmin {
@@ -162,13 +171,13 @@ model Student {
   registrationNumber String          @unique @map("registration_number")
   state              String?
   stateOfOrigin      String?
+  examAttempts       ExamAttempt[]
+  paymentRecords     PaymentRecord[]
   classArm           ClassArm?       @relation(fields: [classArmId], references: [id])
   class              Class?          @relation(fields: [classId], references: [id])
   school             School          @relation(fields: [schoolId], references: [id])
   scores             StudentScore[]
   transactions       Transaction[]
-  paymentRecords     PaymentRecord[]
-  examAttempts       ExamAttempt[]
 }
 
 model Transaction {
@@ -178,20 +187,19 @@ model Transaction {
   amount             Decimal           @db.Decimal(15, 2)
   currency           String            @default("NGN")
   status             TransactionStatus @default(PENDING)
-  processor          String // paystack, korapay, flutterwave
+  processor          String
   studentId          String
   schoolId           String
-  metadata           Json? // To store fee details, installments, etc.
+  metadata           Json?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
   platformFlatKobo   Int               @default(0)
   platformPctKobo    Int               @default(0)
   platformTotalKobo  Int               @default(0)
-
-  student         Student          @relation(fields: [studentId], references: [id])
-  school          School           @relation(fields: [schoolId], references: [id])
-  paymentRecords  PaymentRecord[]
-  platformPayouts PlatformPayout[]
+  paymentRecords     PaymentRecord[]
+  platformPayouts    PlatformPayout[]
+  school             School            @relation(fields: [schoolId], references: [id])
+  student            Student           @relation(fields: [studentId], references: [id])
 
   @@index([reference])
   @@index([studentId])
@@ -199,19 +207,18 @@ model Transaction {
 }
 
 model PaymentRecord {
-  id                String   @id @default(uuid())
+  id                String           @id @default(uuid())
   transactionId     String
   feeId             String
   studentId         String
-  amount            Decimal  @db.Decimal(15, 2)
-  paymentPlan       String // full, installments
+  amount            Decimal          @db.Decimal(15, 2)
+  paymentPlan       String
   installmentNumber Int?
-  receiptNumber     String   @unique
-  createdAt         DateTime @default(now())
-
-  transaction Transaction      @relation(fields: [transactionId], references: [id])
-  fee         FeeConfiguration @relation(fields: [feeId], references: [id])
-  student     Student          @relation(fields: [studentId], references: [id])
+  receiptNumber     String           @unique
+  createdAt         DateTime         @default(now())
+  fee               FeeConfiguration @relation(fields: [feeId], references: [id])
+  student           Student          @relation(fields: [studentId], references: [id])
+  transaction       Transaction      @relation(fields: [transactionId], references: [id])
 
   @@index([transactionId])
   @@index([feeId])
@@ -442,7 +449,6 @@ model Exam {
   teacherId       String
   subjectId       String
   classId         String
-  sessionId       String?
   term            String
   title           String
   durationMinutes Int
@@ -450,18 +456,19 @@ model Exam {
   markPerQuestion Float?
   totalMarks      Float
   totalQuestions  Int
-  examKey         String?
-  status          ResultStatus  @default(PENDING)
-  approvedById    String?
-  rejectionReason String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  approvedById    String?
+  rejectionReason String?
+  status          ResultStatus  @default(PENDING)
+  examKey         String?
+  sessionId       String?
   class           Class         @relation(fields: [classId], references: [id])
   school          School        @relation(fields: [schoolId], references: [id])
   subject         Subject       @relation(fields: [subjectId], references: [id])
   teacher         Teacher       @relation(fields: [teacherId], references: [id])
-  questions       Question[]
   attempts        ExamAttempt[]
+  questions       Question[]
 
   @@index([schoolId, teacherId, subjectId, classId])
 }
@@ -473,23 +480,16 @@ model ExamAttempt {
   startTime DateTime      @default(now())
   endTime   DateTime?
   status    AttemptStatus @default(IN_PROGRESS)
-  answers   Json? // Stores student answers: { questionId: answer }
+  answers   Json?
   score     Float?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
+  exam      Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student   Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
-  exam    Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-
-  @@unique([examId, studentId]) // Ensure one attempt per student per exam
+  @@unique([examId, studentId])
   @@index([examId])
   @@index([studentId])
-}
-
-enum AttemptStatus {
-  IN_PROGRESS
-  SUBMITTED
-  TIMED_OUT
 }
 
 model Question {
@@ -511,13 +511,13 @@ model Communication {
   schoolId      String
   subject       String
   message       String
-  recipientType String // 'staff', 'parents', 'both', 'custom'
+  recipientType String
   recipients    String[]
-  status        String // 'sent', 'failed'
+  status        String
   error         String?
-  fileUrl       String?
-  filePublicId  String?
   timestamp     DateTime @default(now())
+  filePublicId  String?
+  fileUrl       String?
   school        School   @relation(fields: [schoolId], references: [id])
 
   @@index([schoolId])
@@ -550,6 +550,53 @@ model Assignment {
   @@index([schoolId, teacherId, subjectId, classId])
 }
 
+model PlatformConfig {
+  id            String   @id @default(uuid())
+  schoolId      String?
+  flatKobo      Int      @default(0)
+  percentageBps Int      @default(0)
+  capKobo       Int      @default(0)
+  minimumKobo   Int      @default(0)
+  description   String
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  school        School?  @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId, isActive])
+}
+
+model PlatformPayout {
+  id                    String      @id @default(uuid())
+  transactionId         String
+  schoolId              String
+  processor             String
+  method                String
+  status                String      @default("PENDING")
+  platformAmountKobo    Int
+  platformFlatKobo      Int
+  platformPercentKobo   Int
+  gatewayFeeKobo        Int
+  disbursementReference String?
+  batchNote             String?
+  initiatedAt           DateTime?
+  settledAt             DateTime?
+  failureReason         String?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  school                School      @relation(fields: [schoolId], references: [id])
+  transaction           Transaction @relation(fields: [transactionId], references: [id])
+
+  @@index([status, method])
+  @@index([disbursementReference])
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  TIMED_OUT
+}
+
 enum SchoolAdminRole {
   SCHOOL_OWNER
   DIRECTOR
@@ -571,45 +618,4 @@ enum ResultStatus {
   PENDING
   APPROVED
   REJECTED
-}
-
-model PlatformConfig {
-  id            String   @id @default(uuid())
-  schoolId      String? // null = global default; set = school-specific override
-  flatKobo      Int      @default(0)
-  percentageBps Int      @default(0) // 100 = 1%, 50 = 0.5%
-  capKobo       Int      @default(0) // 0 = no cap
-  minimumKobo   Int      @default(0) // 0 = no minimum
-  description   String
-  isActive      Boolean  @default(true)
-  school        School?  @relation(fields: [schoolId], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([schoolId, isActive])
-}
-
-model PlatformPayout {
-  id                    String      @id @default(uuid())
-  transactionId         String
-  schoolId              String
-  processor             String
-  method                String // MANUAL_TRANSFER | GATEWAY_SPLIT
-  status                String      @default("PENDING")
-  platformAmountKobo    Int
-  platformFlatKobo      Int
-  platformPercentKobo   Int
-  gatewayFeeKobo        Int
-  disbursementReference String? // Reference from Korapay transfer API
-  batchNote             String?
-  initiatedAt           DateTime?
-  settledAt             DateTime?
-  failureReason         String?
-  transaction           Transaction @relation(fields: [transactionId], references: [id])
-  school                School      @relation(fields: [schoolId], references: [id])
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
-
-  @@index([status, method])
-  @@index([disbursementReference])
 }

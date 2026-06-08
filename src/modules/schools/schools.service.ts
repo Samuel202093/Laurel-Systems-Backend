@@ -3,6 +3,13 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateSchoolDto } from './dto/create-school.dto';
 import { OtpService } from '../auth/otp.service';
 import { ClassesService } from '../classes/classes.service';
+import { 
+  UpdateCalendarDto, 
+  UpdateGradingDto, 
+  UpdateLocationDto, 
+  UpdatePreferencesDto, 
+  UpdateBrandingDto 
+} from './dto/settings.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -165,5 +172,144 @@ export class SchoolsService {
     return (this.prisma as any).onboardingProgress.delete({
       where: { email },
     }).catch(() => null); // Ignore if not found
+  }
+
+  // ─── SYSTEM SETTINGS ──────────────────────────────────────────────────────
+
+  async getSettings(schoolId: string) {
+    const school = await (this.prisma as any).school.findUnique({
+      where: { id: schoolId },
+      include: {
+        academicSessions: {
+          include: { terms: true },
+          orderBy: { startDate: 'desc' },
+        },
+        gradingSystem: {
+          include: { grades: true },
+        },
+      },
+    });
+
+    if (!school) throw new NotFoundException('School not found');
+
+    return school;
+  }
+
+  async updateCalendar(schoolId: string, dto: UpdateCalendarDto) {
+    return (this.prisma as any).$transaction(async (tx: any) => {
+      // 1. Deactivate all other sessions/terms for this school
+      await tx.academicSession.updateMany({
+        where: { schoolId, isActive: true },
+        data: { isActive: false },
+      });
+
+      await tx.academicTerm.updateMany({
+        where: { session: { schoolId }, isActive: true },
+        data: { isActive: false },
+      });
+
+      // 2. Activate the selected session and term
+      await tx.academicSession.update({
+        where: { id: dto.sessionId },
+        data: { 
+          isActive: true,
+          ...(dto.resumptionDate && { startDate: new Date(dto.resumptionDate) }),
+          ...(dto.closingDate && { endDate: new Date(dto.closingDate) }),
+        },
+      });
+
+      await tx.academicTerm.update({
+        where: { id: dto.termId },
+        data: { 
+          isActive: true,
+          ...(dto.resumptionDate && { startDate: new Date(dto.resumptionDate) }),
+          ...(dto.closingDate && { endDate: new Date(dto.closingDate) }),
+        },
+      });
+
+      return { message: 'Academic calendar synchronized successfully' };
+    });
+  }
+
+  async updateGrading(schoolId: string, dto: UpdateGradingDto) {
+    const activeSession = await (this.prisma as any).academicSession.findFirst({
+      where: { schoolId, isActive: true },
+    });
+
+    if (!activeSession) {
+      throw new BadRequestException('No active academic session found. Please set the academic calendar first.');
+    }
+
+    return (this.prisma as any).$transaction(async (tx: any) => {
+      // 1. Upsert GradingSystem for current session
+      const gradingSystem = await tx.gradingSystem.upsert({
+        where: {
+          schoolId_sessionId_termId: {
+            schoolId,
+            sessionId: activeSession.id,
+            termId: null, // Global for session or specific term? Assuming session-wide for now
+          },
+        },
+        update: {
+          ...(dto.passMark && { passMark: dto.passMark }),
+        },
+        create: {
+          schoolId,
+          sessionId: activeSession.id,
+          passMark: dto.passMark || 40,
+        },
+      });
+
+      // 2. Replace grades
+      await tx.gradeLevel.deleteMany({
+        where: { gradingSystemId: gradingSystem.id },
+      });
+
+      await tx.gradeLevel.createMany({
+        data: dto.grades.map((g) => ({
+          gradingSystemId: gradingSystem.id,
+          name: g.grade,
+          abbreviation: g.grade,
+          minScore: g.min,
+          maxScore: g.max,
+          remark: g.remark,
+        })),
+      });
+
+      return tx.gradingSystem.findUnique({
+        where: { id: gradingSystem.id },
+        include: { grades: true },
+      });
+    });
+  }
+
+  async updateLocation(schoolId: string, dto: UpdateLocationDto) {
+    return (this.prisma as any).school.update({
+      where: { id: schoolId },
+      data: {
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+        geofencingRadius: dto.radius,
+      },
+    });
+  }
+
+  async updatePreferences(schoolId: string, dto: UpdatePreferencesDto) {
+    return (this.prisma as any).school.update({
+      where: { id: schoolId },
+      data: {
+        emailAlerts: dto.emailAlerts,
+        smsAlerts: dto.smsAlerts,
+        currency: dto.currency,
+        publicationMode: dto.publicationMode,
+      },
+    });
+  }
+
+  async updateBranding(schoolId: string, dto: UpdateBrandingDto) {
+    return (this.prisma as any).school.update({
+      where: { id: schoolId },
+      data: dto,
+    });
   }
 }
