@@ -20,46 +20,50 @@ export class OtpService {
     // Remove any existing OTPs for this email before creating a fresh one
     await this.prisma.otp.deleteMany({ where: { email } }).catch(() => null);
 
+    // Persist the OTP to DB immediately — the HTTP response returns as soon as this completes.
+    // The email is sent in the background so the caller is never blocked by the SMTP round-trip.
     await this.prisma.otp.create({
-      data: {
-        email,
-        code,
-        expiresAt,
-      },
+      data: { email, code, expiresAt },
     });
 
-    // For development, log the code.
     this.logger.log(`OTP generated for ${email}: ${code}`);
 
-    try {
-      const schoolName = this.configService.get<string>('SCHOOL_NAME', 'School Management');
-      const subject = `Your ${schoolName} Onboarding Verification Code`;
-      const html = `
-          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 10px;">
-            <div style="background-color: #0891b2; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
-              <h2 style="margin: 0;">Verify Your Email</h2>
-            </div>
-            <div style="padding: 30px; background-color: #ffffff;">
-              <p>Thank you for starting your <strong>${schoolName}</strong> onboarding. Use the code below to verify your email address:</p>
-              <div style="background: #f3f4f6; padding: 20px; font-size: 32px; font-weight: bold; text-align: center; border-radius: 8px; margin: 30px 0; color: #0891b2; letter-spacing: 5px;">
-                ${code}
-              </div>
-              <p>This code will expire in <strong>10 minutes</strong>.</p>
-              <p style="color: #666; font-size: 14px; margin-top: 30px;">If you didn't request this, please ignore this email.</p>
-            </div>
-            <div style="text-align: center; padding: 20px; font-size: 12px; color: #777; background-color: #f9fafb; border-radius: 0 0 10px 10px;">
-              <p>&copy; ${new Date().getFullYear()} ${schoolName}. All rights reserved.</p>
-            </div>
+    // Build the email content
+    const schoolName = this.configService.get<string>('SCHOOL_NAME', 'School Management');
+    const subject = `Your ${schoolName} Onboarding Verification Code`;
+    const html = `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 10px;">
+          <div style="background-color: #0891b2; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h2 style="margin: 0;">Verify Your Email</h2>
           </div>
-        `;
+          <div style="padding: 30px; background-color: #ffffff;">
+            <p>Thank you for starting your <strong>${schoolName}</strong> onboarding. Use the code below to verify your email address:</p>
+            <div style="background: #f3f4f6; padding: 20px; font-size: 32px; font-weight: bold; text-align: center; border-radius: 8px; margin: 30px 0; color: #0891b2; letter-spacing: 5px;">
+              ${code}
+            </div>
+            <p>This code will expire in <strong>10 minutes</strong>.</p>
+            <p style="color: #666; font-size: 14px; margin-top: 30px;">If you didn't request this, please ignore this email.</p>
+          </div>
+          <div style="text-align: center; padding: 20px; font-size: 12px; color: #777; background-color: #f9fafb; border-radius: 0 0 10px 10px;">
+            <p>&copy; ${new Date().getFullYear()} ${schoolName}. All rights reserved.</p>
+          </div>
+        </div>
+      `;
 
-      await this.mailService.sendMail(email, subject, html, schoolName);
-      this.logger.log(`OTP email successfully sent to ${email}`);
-    } catch (error) {
-      this.logger.error(`Failed to send OTP email to ${email}:`, error.stack);
-      throw new BadRequestException(`Failed to send verification email: ${error.message}`);
-    }
+    // Fire-and-forget: send email in the background.
+    // The OTP is already persisted, so the user can verify even if email delivery
+    // is momentarily slow. Errors are logged; the user can hit "Resend" if needed.
+    this.mailService
+      .sendMail(email, subject, html, schoolName)
+      .then(() => this.logger.log(`OTP email successfully sent to ${email}`))
+      .catch((err: Error) =>
+        this.logger.error(
+          `OTP email delivery failed for ${email} (user can resend). Error: ${err.message}`,
+          err.stack,
+        ),
+      );
 
+    // Return immediately — client gets the response without waiting on SMTP
     return { expiresAt: expiresAt.getTime() };
   }
 
@@ -82,10 +86,7 @@ export class OtpService {
       throw new BadRequestException('Invalid or expired OTP');
     }
 
-    // Instead of deleting, just return true. 
-    // The registration endpoint will call clearOnboardingProgress which should handle cleanup.
-    // Or we can mark it as verified if you have a field for that.
-    
+    // OTP is valid. Cleanup happens in clearOnboardingProgress after successful registration.
     return true;
   }
 }

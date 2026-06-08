@@ -24,27 +24,39 @@ export class MailService {
     const port = Number(mailPort) || 587;
     const isSecure = port === 465; // true only for SSL; STARTTLS uses 587
 
-    this.transporter = nodemailer.createTransport({
+    // Cast to `any` so that runtime-only options (family, pool, maxConnections, etc.)
+    // that are absent from nodemailer's TS type definitions don't cause TS2769.
+    const smtpConfig: any = {
       host: mailHost,
       port,
       secure: isSecure,
       requireTLS: !isSecure, // Force STARTTLS upgrade on port 587
+      // Force IPv4 — Render.com does not support outbound IPv6 TCP (ENETUNREACH fix)
+      family: 4,
+      // Connection pooling: reuse SMTP connections instead of opening one per email
+      pool: true,
+      maxConnections: 5,
+      maxMessages: 100,
+      // Tight timeouts so failures surface quickly
+      connectionTimeout: 10_000, // 10 s to establish TCP connection
+      greetingTimeout: 10_000,   // 10 s for SMTP EHLO greeting
+      socketTimeout: 30_000,     // 30 s idle socket timeout
       auth: {
         user: mailUser,
         pass: mailPassword,
       },
       tls: {
-        // Do not fail on invalid certs
         rejectUnauthorized: false,
       },
-    });
+    };
+    this.transporter = nodemailer.createTransport(smtpConfig);
 
-    // Verify connection configuration
-    this.transporter.verify((error, success) => {
+    // Verify connection configuration (runs in background — does not block startup)
+    this.transporter.verify((error) => {
       if (error) {
-        this.logger.error('Transporter verification failed:', error);
+        this.logger.error('SMTP transporter verification failed:', error.message);
       } else {
-        this.logger.log('Mail server is ready to take our messages');
+        this.logger.log('SMTP server is ready — mail will be delivered via IPv4');
       }
     });
   }
