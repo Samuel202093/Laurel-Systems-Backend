@@ -139,17 +139,36 @@ export class SchoolsService {
   }
 
   // Multi-step onboarding progress tracking
-  async saveOnboardingProgress(email: string, step: number, data: any) {
-    this.logger.log(`Saving onboarding progress for ${email} at step ${step}`);
+  // async saveOnboardingProgress(email: string, step: number, data: any) {
+  //   this.logger.log(`Saving onboarding progress for ${email} at step ${step}`);
     
-    const progress = await (this.prisma as any).onboardingProgress.upsert({
-      where: { email },
-      update: { step, data },
-      create: { email, step, data },
-    });
+  //   const progress = await (this.prisma as any).onboardingProgress.upsert({
+  //     where: { email },
+  //     update: { step, data },
+  //     create: { email, step, data },
+  //   });
 
-    return progress;
+  //   return progress;
+  // }
+
+
+async saveOnboardingProgress(email: string, step: number, data: any) {
+  this.logger.log(`Saving onboarding progress for ${email} at step ${step}`);
+
+  const progress = await (this.prisma as any).onboardingProgress.upsert({
+    where: { email },
+    update: { step, data },
+    create: { email, step, data },
+  });
+
+  // When saving step 2, generate and send the OTP immediately
+  if (step === 2) {
+    const otpResult = await this.otpService.sendOtp(email);
+    return { ...progress, otpInfo: otpResult };
   }
+
+  return progress;
+}
 
   async getOnboardingProgress(email: string) {
     const progress = await (this.prisma as any).onboardingProgress.findUnique({
