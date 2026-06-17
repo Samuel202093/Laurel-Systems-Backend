@@ -11,22 +11,39 @@ export class MailService {
   constructor(private configService: ConfigService) {
     this.fromAddress = this.configService.get<string>('EMAIL_FROM') ?? '';
 
+    // Resolve port once so both `port` and `secure` use the same value
+    const port = this.configService.get<number>('MAIL_PORT', 587);
+    const secure = port === 465;
+
     this.transporter = nodemailer.createTransport({
       host: this.configService.get<string>('MAIL_HOST', 'smtp.gmail.com'),
-      port: this.configService.get<number>('MAIL_PORT', 587),
-      secure: this.configService.get<number>('MAIL_PORT') === 465,
+      port,
+      secure, // true only for port 465 (SSL); false for 587 (STARTTLS)
       auth: {
         user: this.configService.get<string>('MAIL_USER'),
-        pass: this.configService.get<string>('MAIL_PASS'),
+        pass: this.configService.get<string>('MAIL_PASS'), // Use an App Password for Gmail
       },
       tls: {
         rejectUnauthorized: false,
+        // Improves TLS compatibility on some hosted environments
+        ciphers: 'SSLv3',
       },
-      // force IPv4 — this is the key fix for Render
+      // Force IPv4 — required on Render to avoid IPv6 connectivity issues
       family: 4,
     } as any);
 
-    this.logger.log(`MailService initialised — from: ${this.fromAddress}`);
+    // Verify transporter config on startup so misconfiguration is caught early
+    this.transporter.verify((error) => {
+      if (error) {
+        this.logger.error(`Mail transporter verification failed: ${error.message}`, error.stack);
+      } else {
+        this.logger.log('Mail transporter is ready to send messages');
+      }
+    });
+
+    this.logger.log(
+      `MailService initialised — host: ${this.configService.get('MAIL_HOST', 'smtp.gmail.com')}, port: ${port}, secure: ${secure}, from: ${this.fromAddress}`,
+    );
   }
 
   async sendMail(
@@ -44,7 +61,7 @@ export class MailService {
         : bcc
       : undefined;
 
-    this.logger.log(`Attempting to send email to: ${recipients} with subject: ${subject}`);
+    this.logger.log(`Attempting to send email to: ${recipients} | subject: ${subject}`);
 
     try {
       const result = await this.transporter.sendMail({
@@ -54,17 +71,28 @@ export class MailService {
         subject,
         html,
       });
-      this.logger.log(`Email successfully sent. MessageId: ${result.messageId}`);
+      this.logger.log(`Email sent successfully. MessageId: ${result.messageId}`);
       return result;
     } catch (error) {
-      this.logger.error(`Failed to send email to ${recipients}. Error: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to send email to ${recipients}. Error: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
-  async sendTeacherWelcomeEmail(email: string, fullName: string, staffId: string, tempPassword: string, schoolName?: string) {
-    const finalSchoolName = schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
-    const loginUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000') + '/login';
+  async sendTeacherWelcomeEmail(
+    email: string,
+    fullName: string,
+    staffId: string,
+    tempPassword: string,
+    schoolName?: string,
+  ) {
+    const finalSchoolName =
+      schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
+    const loginUrl =
+      this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000') + '/login';
 
     const html = `
       <!DOCTYPE html>
@@ -90,9 +118,9 @@ export class MailService {
           <div class="content">
             <p>Dear <strong>${fullName}</strong>,</p>
             <p>Welcome to the team! You have been registered as a staff member at <strong>${finalSchoolName}</strong>. Your account has been created successfully.</p>
-            
+
             <p>Please use the credentials below to log in to the school management portal:</p>
-            
+
             <div class="credentials">
               <div class="credential-item">
                 <span class="label">Staff ID:</span> <span>${staffId}</span>
@@ -104,15 +132,15 @@ export class MailService {
                 <span class="label">Temporary Password:</span> <span>${tempPassword}</span>
               </div>
             </div>
-            
+
             <p>For security reasons, we recommend that you change your password immediately after your first login.</p>
-            
+
             <div style="text-align: center;">
               <a href="${loginUrl}" class="button">Log In to Portal</a>
             </div>
-            
+
             <p style="margin-top: 30px;">If you have any questions or encounter any issues, please contact the IT department.</p>
-            
+
             <p>Best regards,<br>The Administration Team</p>
           </div>
           <div class="footer">
@@ -123,12 +151,25 @@ export class MailService {
       </html>
     `;
 
-    return this.sendMail(email, `Welcome to ${finalSchoolName} - Your Login Details`, html, finalSchoolName);
+    return this.sendMail(
+      email,
+      `Welcome to ${finalSchoolName} - Your Login Details`,
+      html,
+      finalSchoolName,
+    );
   }
 
-  async sendStudentWelcomeEmail(email: string, fullName: string, registrationNumber: string, tempPassword: string, schoolName?: string) {
-    const finalSchoolName = schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
-    const loginUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000') + '/login';
+  async sendStudentWelcomeEmail(
+    email: string,
+    fullName: string,
+    registrationNumber: string,
+    tempPassword: string,
+    schoolName?: string,
+  ) {
+    const finalSchoolName =
+      schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
+    const loginUrl =
+      this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000') + '/login';
 
     const html = `
       <!DOCTYPE html>
@@ -155,9 +196,9 @@ export class MailService {
           <div class="content">
             <p>Dear <strong>${fullName}</strong>,</p>
             <p>Welcome! You have been registered as a student at <strong>${finalSchoolName}</strong>. Your account has been created successfully.</p>
-            
+
             <p>To access the school portal, please <span class="highlight">login with your Registration Number and Password</span> provided below:</p>
-            
+
             <div class="credentials">
               <div class="credential-item">
                 <span class="label">Registration Number:</span> <span class="highlight">${registrationNumber}</span>
@@ -169,15 +210,15 @@ export class MailService {
                 <span class="label">Temporary Password:</span> <span class="highlight">${tempPassword}</span>
               </div>
             </div>
-            
+
             <p>For security reasons, we recommend that you change your password immediately after your first login.</p>
-            
+
             <div style="text-align: center;">
               <a href="${loginUrl}" class="button">Log In to Portal</a>
             </div>
-            
+
             <p style="margin-top: 30px;">If you have any questions, please contact the school administration.</p>
-            
+
             <p>Best regards,<br>The Administration Team</p>
           </div>
           <div class="footer">
@@ -188,11 +229,22 @@ export class MailService {
       </html>
     `;
 
-    return this.sendMail(email, `Welcome to ${finalSchoolName} - Student Account Details`, html, finalSchoolName);
+    return this.sendMail(
+      email,
+      `Welcome to ${finalSchoolName} - Student Account Details`,
+      html,
+      finalSchoolName,
+    );
   }
 
-  async sendPasswordChangeEmail(email: string, fullName: string, newPassword: string, schoolName?: string) {
-    const finalSchoolName = schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
+  async sendPasswordChangeEmail(
+    email: string,
+    fullName: string,
+    newPassword: string,
+    schoolName?: string,
+  ) {
+    const finalSchoolName =
+      schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
 
     const html = `
       <!DOCTYPE html>
@@ -218,13 +270,13 @@ export class MailService {
           <div class="content">
             <p>Dear <strong>${fullName}</strong>,</p>
             <p>This is to inform you that the password for your account at <strong>${finalSchoolName}</strong> has been successfully changed.</p>
-            
+
             <div class="alert">
               <p><strong>Warning:</strong> If you did not initiate this change, please contact the school administration or IT support immediately as your account may be compromised.</p>
             </div>
 
             <p>For your records, your new login details are:</p>
-            
+
             <div class="credentials">
               <div class="credential-item">
                 <span class="label">Email:</span> <span>${email}</span>
@@ -233,7 +285,7 @@ export class MailService {
                 <span class="label">New Password:</span> <span>${newPassword}</span>
               </div>
             </div>
-            
+
             <p>Best regards,<br>The Administration Team</p>
           </div>
           <div class="footer">
@@ -247,9 +299,13 @@ export class MailService {
     return this.sendMail(email, `Security Update - Password Changed`, html, finalSchoolName);
   }
 
-  async sendAssignmentNotificationEmail(assignmentInfo: any, students: any[], schoolName?: string) {
+  async sendAssignmentNotificationEmail(
+    assignmentInfo: any,
+    students: any[],
+    schoolName?: string,
+  ) {
     const finalSchoolName = schoolName || 'Our School';
-    const studentEmails = students.map(s => s.email);
+    const studentEmails = students.map((s) => s.email);
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
@@ -259,7 +315,7 @@ export class MailService {
         <div style="padding: 20px;">
           <p>Hello Student,</p>
           <p>A new assignment has been posted for <strong>${assignmentInfo.subjectName}</strong> in <strong>${assignmentInfo.className}</strong>.</p>
-          
+
           <div style="background-color: #f9fafb; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <p><strong>Title:</strong> ${assignmentInfo.title}</p>
             <p><strong>Type:</strong> ${assignmentInfo.assignmentType}</p>
@@ -271,8 +327,12 @@ export class MailService {
           <p><strong>Description:</strong></p>
           <p>${assignmentInfo.description}</p>
 
-          ${assignmentInfo.fileUrl ? `<p><a href="${assignmentInfo.fileUrl}" style="color: #4f46e5; font-weight: bold;">Download Attachment</a></p>` : ''}
-          
+          ${
+            assignmentInfo.fileUrl
+              ? `<p><a href="${assignmentInfo.fileUrl}" style="color: #4f46e5; font-weight: bold;">Download Attachment</a></p>`
+              : ''
+          }
+
           <p>Please log in to the portal to view more details and submit your work.</p>
         </div>
         <div style="text-align: center; padding: 20px; color: #6b7280; font-size: 12px; border-top: 1px solid #e0e0e0;">
@@ -281,26 +341,35 @@ export class MailService {
       </div>
     `;
 
-    return this.sendMail(studentEmails, `New Assignment: ${assignmentInfo.title}`, html, finalSchoolName);
+    return this.sendMail(
+      studentEmails,
+      `New Assignment: ${assignmentInfo.title}`,
+      html,
+      finalSchoolName,
+    );
   }
 
-  async sendExamClassResultsToTeacher(data: { 
-    teacher: { fullName: string; email: string }; 
-    exam: { title: string; totalMarks: number; subject: any; class: any; term: string }; 
-    attempts: any[]; 
-    school: { name: string; shortName: string | null } 
+  async sendExamClassResultsToTeacher(data: {
+    teacher: { fullName: string; email: string };
+    exam: { title: string; totalMarks: number; subject: any; class: any; term: string };
+    attempts: any[];
+    school: { name: string; shortName: string | null };
   }) {
     const { teacher, exam, attempts, school } = data;
     const finalSchoolName = school.name;
 
-    const attemptsHtml = attempts.map(a => `
+    const attemptsHtml = attempts
+      .map(
+        (a) => `
       <tr>
         <td style="padding: 10px; border-bottom: 1px solid #eee;">${a.studentName}</td>
         <td style="padding: 10px; border-bottom: 1px solid #eee;">${a.registrationNumber}</td>
         <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">${a.score} / ${exam.totalMarks}</td>
         <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">${a.percentage}%</td>
       </tr>
-    `).join('');
+    `,
+      )
+      .join('');
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
@@ -311,7 +380,7 @@ export class MailService {
         <div style="padding: 20px;">
           <p>Dear ${teacher.fullName},</p>
           <p>Students have completed the CBT exam. Here is a summary of the results:</p>
-          
+
           <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
             <thead>
               <tr style="background-color: #f9fafb;">
@@ -334,6 +403,11 @@ export class MailService {
       </div>
     `;
 
-    return this.sendMail(teacher.email, `Exam Results: ${exam.title} (${exam.class?.name})`, html, finalSchoolName);
+    return this.sendMail(
+      teacher.email,
+      `Exam Results: ${exam.title} (${exam.class?.name})`,
+      html,
+      finalSchoolName,
+    );
   }
 }
