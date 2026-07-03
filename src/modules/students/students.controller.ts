@@ -15,8 +15,18 @@ import type { Response } from 'express';
 import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
-import { PromoteStudentDto, PromoteMultipleStudentsDto } from './dto/promote-student.dto';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  PromoteStudentDto,
+  PromoteMultipleStudentsDto,
+} from './dto/promote-student.dto';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -29,14 +39,15 @@ export class StudentsController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles( 
-  'SCHOOL_OWNER',
-  'DIRECTOR',
-  'PRINCIPAL',
-  'ICT_ADMIN',    
-  'SUB_ADMIN',
-  'TEACHER',
-  'SCHOOL_ADMIN', )
+  @Roles(
+    'SCHOOL_OWNER',
+    'DIRECTOR',
+    'PRINCIPAL',
+    'ICT_ADMIN',
+    'SUB_ADMIN',
+    'TEACHER',
+    'SCHOOL_ADMIN',
+  )
   @ApiOperation({ summary: 'Create a new student' })
   @ApiResponse({ status: 201, description: 'Student created successfully' })
   async create(
@@ -54,8 +65,18 @@ export class StudentsController {
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SUPER_ADMIN', 'SCHOOL_OWNER', 'DIRECTOR', 'PRINCIPAL', 'ICT_ADMIN', 'SUB_ADMIN', 'TEACHER')
-  @ApiOperation({ summary: 'Get all students for a school with pagination and filters' })
+  @Roles(
+    'SUPER_ADMIN',
+    'SCHOOL_OWNER',
+    'DIRECTOR',
+    'PRINCIPAL',
+    'ICT_ADMIN',
+    'SUB_ADMIN',
+    'TEACHER',
+  )
+  @ApiOperation({
+    summary: 'Get all students for a school with pagination and filters',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'search', required: false, type: String })
@@ -86,7 +107,16 @@ export class StudentsController {
 
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SUPER_ADMIN', 'SCHOOL_OWNER', 'DIRECTOR', 'PRINCIPAL', 'ICT_ADMIN', 'SUB_ADMIN', 'TEACHER', 'STUDENT')
+  @Roles(
+    'SUPER_ADMIN',
+    'SCHOOL_OWNER',
+    'DIRECTOR',
+    'PRINCIPAL',
+    'ICT_ADMIN',
+    'SUB_ADMIN',
+    'TEACHER',
+    'STUDENT',
+  )
   @ApiOperation({ summary: 'Get a single student by ID' })
   async findOne(
     @Param('schoolId') schoolId: string,
@@ -103,7 +133,16 @@ export class StudentsController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SUPER_ADMIN', 'SCHOOL_OWNER', 'DIRECTOR', 'PRINCIPAL', 'ICT_ADMIN', 'SUB_ADMIN', 'TEACHER', 'STUDENT')
+  @Roles(
+    'SUPER_ADMIN',
+    'SCHOOL_OWNER',
+    'DIRECTOR',
+    'PRINCIPAL',
+    'ICT_ADMIN',
+    'SUB_ADMIN',
+    'TEACHER',
+    'STUDENT',
+  )
   @ApiOperation({ summary: 'Update a student' })
   async update(
     @Param('schoolId') schoolId: string,
@@ -121,7 +160,14 @@ export class StudentsController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SUPER_ADMIN', 'SCHOOL_OWNER', 'DIRECTOR', 'PRINCIPAL', 'ICT_ADMIN', 'SUB_ADMIN')
+  @Roles(
+    'SUPER_ADMIN',
+    'SCHOOL_OWNER',
+    'DIRECTOR',
+    'PRINCIPAL',
+    'ICT_ADMIN',
+    'SUB_ADMIN',
+  )
   @ApiOperation({ summary: 'Delete a student' })
   async remove(
     @Param('schoolId') schoolId: string,
@@ -137,7 +183,14 @@ export class StudentsController {
 
   @Post('promote')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SUPER_ADMIN', 'SCHOOL_OWNER', 'DIRECTOR', 'PRINCIPAL', 'ICT_ADMIN', 'SUB_ADMIN')
+  @Roles(
+    'SUPER_ADMIN',
+    'SCHOOL_OWNER',
+    'DIRECTOR',
+    'PRINCIPAL',
+    'ICT_ADMIN',
+    'SUB_ADMIN',
+  )
   @ApiOperation({ summary: 'Promote a student to a new class' })
   async promote(
     @Param('schoolId') schoolId: string,
@@ -154,7 +207,14 @@ export class StudentsController {
 
   @Post('promote-multiple')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SUPER_ADMIN', 'SCHOOL_OWNER', 'DIRECTOR', 'PRINCIPAL', 'ICT_ADMIN', 'SUB_ADMIN')
+  @Roles(
+    'SUPER_ADMIN',
+    'SCHOOL_OWNER',
+    'DIRECTOR',
+    'PRINCIPAL',
+    'ICT_ADMIN',
+    'SUB_ADMIN',
+  )
   @ApiOperation({ summary: 'Promote multiple students to a new class' })
   async promoteMultiple(
     @Param('schoolId') schoolId: string,

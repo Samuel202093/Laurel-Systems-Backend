@@ -31,7 +31,10 @@ export class SendEmailDto {
     type: [String],
   })
   @IsArray()
-  @IsEmail({}, { each: true, message: 'Each recipient must be a valid email address' })
+  @IsEmail(
+    {},
+    { each: true, message: 'Each recipient must be a valid email address' },
+  )
   @ArrayMinSize(1, { message: 'At least one recipient email is required' })
   recipients: string[];
 
@@ -45,7 +48,8 @@ export class SendEmailDto {
 
   @ApiProperty({
     description: 'The body of the email message',
-    example: 'Please be informed that the annual sports day will hold on Friday...',
+    example:
+      'Please be informed that the annual sports day will hold on Friday...',
   })
   @IsString()
   @IsNotEmpty({ message: 'Message body is required' })
@@ -61,12 +65,16 @@ export class SendEmailDto {
   })
   recipientType: RecipientType;
 
-  @ApiPropertyOptional({ description: 'Attachment URL from Cloudinary (if pre-uploaded)' })
+  @ApiPropertyOptional({
+    description: 'Attachment URL from Cloudinary (if pre-uploaded)',
+  })
   @IsOptional()
   @IsString()
   fileUrl?: string;
 
-  @ApiPropertyOptional({ description: 'Cloudinary public ID for the attachment (for deletion)' })
+  @ApiPropertyOptional({
+    description: 'Cloudinary public ID for the attachment (for deletion)',
+  })
   @IsOptional()
   @IsString()
   filePublicId?: string;
@@ -83,7 +91,8 @@ export class SendSingleEmailDto {
   recipient: string;
 
   @ApiPropertyOptional({
-    description: 'Full name of the recipient for personalised greeting (optional)',
+    description:
+      'Full name of the recipient for personalised greeting (optional)',
     example: 'John Doe',
   })
   @IsOptional()
@@ -116,12 +125,16 @@ export class SendSingleEmailDto {
   })
   recipientType: RecipientType;
 
-  @ApiPropertyOptional({ description: 'Attachment URL from Cloudinary (if pre-uploaded)' })
+  @ApiPropertyOptional({
+    description: 'Attachment URL from Cloudinary (if pre-uploaded)',
+  })
   @IsOptional()
   @IsString()
   fileUrl?: string;
 
-  @ApiPropertyOptional({ description: 'Cloudinary public ID for the attachment (for deletion)' })
+  @ApiPropertyOptional({
+    description: 'Cloudinary public ID for the attachment (for deletion)',
+  })
   @IsOptional()
   @IsString()
   filePublicId?: string;
@@ -143,7 +156,10 @@ export class SaveHistoryDto {
   @IsEnum(RecipientType)
   recipientType: RecipientType;
 
-  @ApiProperty({ description: 'Array of recipient email addresses', type: [String] })
+  @ApiProperty({
+    description: 'Array of recipient email addresses',
+    type: [String],
+  })
   @IsArray()
   @IsString({ each: true })
   @ArrayMinSize(1)
@@ -159,7 +175,9 @@ export class SaveHistoryDto {
   })
   status: CommunicationStatus;
 
-  @ApiPropertyOptional({ description: 'Error detail if delivery failed or was partial' })
+  @ApiPropertyOptional({
+    description: 'Error detail if delivery failed or was partial',
+  })
   @IsOptional()
   @IsString()
   error?: string;
@@ -169,7 +187,9 @@ export class SaveHistoryDto {
   @IsString()
   fileUrl?: string;
 
-  @ApiPropertyOptional({ description: 'Cloudinary public ID for the attachment' })
+  @ApiPropertyOptional({
+    description: 'Cloudinary public ID for the attachment',
+  })
   @IsOptional()
   @IsString()
   filePublicId?: string;

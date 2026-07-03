@@ -32,7 +32,9 @@ export class FeesService {
       where: { id },
     });
     if (!fee || fee.schoolId !== schoolId) {
-      throw new NotFoundException(`Fee configuration with ID "${id}" not found`);
+      throw new NotFoundException(
+        `Fee configuration with ID "${id}" not found`,
+      );
     }
     return fee;
   }
@@ -45,7 +47,17 @@ export class FeesService {
    * installments is required when paymentPlan === 'installments'.
    */
   async create(dto: CreateFeeDto) {
-    const { schoolId, feeName, session, term, paymentPlan, installments, dueDate, amount, ...rest } = dto;
+    const {
+      schoolId,
+      feeName,
+      session,
+      term,
+      paymentPlan,
+      installments,
+      dueDate,
+      amount,
+      ...rest
+    } = dto;
 
     // 1. Validate school
     await this.assertSchoolExists(schoolId);
@@ -97,7 +109,9 @@ export class FeesService {
         );
       }
       console.error('[FeesService.create]', error);
-      throw new InternalServerErrorException('Failed to create fee configuration');
+      throw new InternalServerErrorException(
+        'Failed to create fee configuration',
+      );
     }
   }
 
@@ -135,7 +149,14 @@ export class FeesService {
    * Re-validates the unique constraint if feeName/session/term change.
    */
   async update(id: string, schoolId: string, dto: UpdateFeeDto) {
-    const { schoolId: _ignored, dueDate, amount, paymentPlan, installments, ...rest } = dto;
+    const {
+      schoolId: _ignored,
+      dueDate,
+      amount,
+      paymentPlan,
+      installments,
+      ...rest
+    } = dto;
 
     // Confirm fee exists and belongs to school
     const fee = await this.findOneSecure(id, schoolId);
@@ -159,9 +180,13 @@ export class FeesService {
     if (dueDate !== undefined) data.dueDate = new Date(dueDate);
     if (paymentPlan !== undefined) {
       data.paymentPlan = paymentPlan;
-      data.installments = paymentPlan === 'installments' ? (installments ?? fee.installments) : null;
+      data.installments =
+        paymentPlan === 'installments'
+          ? (installments ?? fee.installments)
+          : null;
     }
-    if (rest.bankAccountIds !== undefined) data.bankAccountIds = rest.bankAccountIds;
+    if (rest.bankAccountIds !== undefined)
+      data.bankAccountIds = rest.bankAccountIds;
 
     try {
       return await (this.prisma as any).feeConfiguration.update({
@@ -175,7 +200,9 @@ export class FeesService {
         );
       }
       console.error('[FeesService.update]', error);
-      throw new InternalServerErrorException('Failed to update fee configuration');
+      throw new InternalServerErrorException(
+        'Failed to update fee configuration',
+      );
     }
   }
 
@@ -195,7 +222,9 @@ export class FeesService {
     }
 
     if (!student.class) {
-      throw new BadRequestException('Student is not currently assigned to a class');
+      throw new BadRequestException(
+        'Student is not currently assigned to a class',
+      );
     }
 
     const className = student.class.name;

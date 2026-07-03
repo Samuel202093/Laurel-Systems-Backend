@@ -33,7 +33,9 @@ export class ResultsService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   private isUuid(value: string): boolean {
-    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      value,
+    );
   }
 
   /** Fetch the school's public profile for embedding in result responses. */
@@ -55,7 +57,11 @@ export class ResultsService {
   }
 
   /** Resolve (or auto-create) an academic session by name or UUID. */
-  private async resolveSession(tx: any, schoolId: string, sessionNameOrId: string) {
+  private async resolveSession(
+    tx: any,
+    schoolId: string,
+    sessionNameOrId: string,
+  ) {
     const orClause: any[] = [{ name: sessionNameOrId }];
     if (this.isUuid(sessionNameOrId)) orClause.unshift({ id: sessionNameOrId });
 
@@ -84,7 +90,8 @@ export class ResultsService {
 
   /** Resolve (or auto-create) an academic term by name or UUID. */
   private async resolveTerm(tx: any, session: any, termNameOrId?: string) {
-    if (!termNameOrId || termNameOrId.toLowerCase() === 'session-wide') return null;
+    if (!termNameOrId || termNameOrId.toLowerCase() === 'session-wide')
+      return null;
 
     const orClause: any[] = [{ name: termNameOrId }];
     if (this.isUuid(termNameOrId)) orClause.unshift({ id: termNameOrId });
@@ -109,18 +116,32 @@ export class ResultsService {
   }
 
   /** Resolve a subject by name or UUID. */
-  private async resolveSubject(tx: any, schoolId: string, subjectNameOrId: string) {
+  private async resolveSubject(
+    tx: any,
+    schoolId: string,
+    subjectNameOrId: string,
+  ) {
     const orClause: any[] = [{ name: subjectNameOrId }];
     if (this.isUuid(subjectNameOrId)) orClause.unshift({ id: subjectNameOrId });
 
-    const subject = await tx.subject.findFirst({ where: { schoolId, OR: orClause } });
-    if (!subject) throw new NotFoundException(`Subject "${subjectNameOrId}" not found.`);
+    const subject = await tx.subject.findFirst({
+      where: { schoolId, OR: orClause },
+    });
+    if (!subject)
+      throw new NotFoundException(`Subject "${subjectNameOrId}" not found.`);
     return subject;
   }
 
   private readonly ADMIN_ROLES = [
-    'SUPER_ADMIN', 'SCHOOL_ADMIN', 'SCHOOL-ADMIN', 'SCHOOL_OWNER',
-    'DIRECTOR', 'PRINCIPAL', 'ICT_ADMIN', 'SUB_ADMIN', 'ADMIN',
+    'SUPER_ADMIN',
+    'SCHOOL_ADMIN',
+    'SCHOOL-ADMIN',
+    'SCHOOL_OWNER',
+    'DIRECTOR',
+    'PRINCIPAL',
+    'ICT_ADMIN',
+    'SUB_ADMIN',
+    'ADMIN',
   ];
 
   private isAdmin(roles: string[]): boolean {
@@ -134,12 +155,25 @@ export class ResultsService {
   // ═══════════════════════════════════════════════════════════════════════════
   //  UPLOAD / UPSERT RESULTS
   // ═══════════════════════════════════════════════════════════════════════════
-  async uploadResults(schoolId: string, teacherId: string, dto: UploadResultDto) {
+  async uploadResults(
+    schoolId: string,
+    teacherId: string,
+    dto: UploadResultDto,
+  ) {
     if (!teacherId) {
-      throw new BadRequestException('Teacher ID is missing. Please log in again.');
+      throw new BadRequestException(
+        'Teacher ID is missing. Please log in again.',
+      );
     }
 
-    const { classId, classArmId, subjectId: subjectNameOrId, sessionId, termName, scores } = dto;
+    const {
+      classId,
+      classArmId,
+      subjectId: subjectNameOrId,
+      sessionId,
+      termName,
+      scores,
+    } = dto;
 
     const teacher = await (this.prisma as any).teacher.findUnique({
       where: { id: teacherId },
@@ -147,19 +181,31 @@ export class ResultsService {
     });
 
     if (!teacher || teacher.schoolId !== schoolId) {
-      throw new ForbiddenException('Teacher not found or does not belong to this school.');
+      throw new ForbiddenException(
+        'Teacher not found or does not belong to this school.',
+      );
     }
 
-    const subject = await this.resolveSubject(this.prisma, schoolId, subjectNameOrId);
+    const subject = await this.resolveSubject(
+      this.prisma,
+      schoolId,
+      subjectNameOrId,
+    );
 
     const isAssignedToSubject = teacher.subjects.some(
       (s: string) => s === subject.id || s === subject.name,
     );
     if (!isAssignedToSubject) {
-      throw new ForbiddenException(`You are not assigned to the subject "${subject.name}".`);
+      throw new ForbiddenException(
+        `You are not assigned to the subject "${subject.name}".`,
+      );
     }
 
-    const gradingSystem = await this.gradingService.getGradingSystem(schoolId, sessionId, termName);
+    const gradingSystem = await this.gradingService.getGradingSystem(
+      schoolId,
+      sessionId,
+      termName,
+    );
     if (!gradingSystem) {
       throw new BadRequestException(
         `Grading system not set for session "${sessionId}" and term "${termName}".`,
@@ -172,34 +218,57 @@ export class ResultsService {
       const finalTermId = term?.id || null;
 
       let result = await (tx as any).result.findFirst({
-        where: { schoolId, classId, classArmId, subjectId: subject.id, sessionId: session.id, termId: finalTermId },
+        where: {
+          schoolId,
+          classId,
+          classArmId,
+          subjectId: subject.id,
+          sessionId: session.id,
+          termId: finalTermId,
+        },
       });
 
       let isUpdate = false;
 
       if (result) {
         isUpdate = true;
-        if (result.teacherId !== teacherId && result.status === ResultStatus.APPROVED) {
+        if (
+          result.teacherId !== teacherId &&
+          result.status === ResultStatus.APPROVED
+        ) {
           throw new ForbiddenException(
             'This result is approved. Contact admin to revoke approval before re-uploading.',
           );
         }
         result = await (tx as any).result.update({
           where: { id: result.id },
-          data: { teacherId, status: ResultStatus.PENDING, approvedById: null, rejectionReason: null },
+          data: {
+            teacherId,
+            status: ResultStatus.PENDING,
+            approvedById: null,
+            rejectionReason: null,
+          },
         });
       } else {
         result = await (tx as any).result.create({
           data: {
-            schoolId, classId, classArmId, subjectId: subject.id,
-            sessionId: session.id, termId: finalTermId, teacherId,
+            schoolId,
+            classId,
+            classArmId,
+            subjectId: subject.id,
+            sessionId: session.id,
+            termId: finalTermId,
+            teacherId,
             status: ResultStatus.PENDING,
           },
         });
       }
 
       const studentScoreData = scores.map((s) => {
-        const totalScore = Object.values(s.assessmentScores).reduce((acc, curr) => acc + curr, 0);
+        const totalScore = Object.values(s.assessmentScores).reduce(
+          (acc, curr) => acc + curr,
+          0,
+        );
         const gradeLevel = gradingSystem.grades.find(
           (g) => totalScore >= g.minScore && totalScore <= g.maxScore,
         );
@@ -213,7 +282,9 @@ export class ResultsService {
         };
       });
 
-      await (tx as any).studentScore.deleteMany({ where: { resultId: result.id } });
+      await (tx as any).studentScore.deleteMany({
+        where: { resultId: result.id },
+      });
       await (tx as any).studentScore.createMany({ data: studentScoreData });
 
       // Fetch school info to surface schoolName at response top level
@@ -232,8 +303,14 @@ export class ResultsService {
   // ═══════════════════════════════════════════════════════════════════════════
   //  VIEW RESULTS (unified list — admin / teacher)
   // ═══════════════════════════════════════════════════════════════════════════
-  async getResults(schoolId: string, userId: string, roles: string[], filters: any) {
-    const { classId, classArmId, subjectId, sessionId, termName, status } = filters;
+  async getResults(
+    schoolId: string,
+    userId: string,
+    roles: string[],
+    filters: any,
+  ) {
+    const { classId, classArmId, subjectId, sessionId, termName, status } =
+      filters;
 
     // Fetch school info directly — no need for an array wrapper
     const schoolInfo = await this.fetchSchoolInfo(schoolId);
@@ -262,7 +339,10 @@ export class ResultsService {
         where.sessionId = session.id;
         if (termName) {
           const term = await (this.prisma as any).academicTerm.findFirst({
-            where: { sessionId: session.id, OR: [{ id: termName }, { name: termName }] },
+            where: {
+              sessionId: session.id,
+              OR: [{ id: termName }, { name: termName }],
+            },
           });
           if (term) where.termId = term.id;
         }
@@ -294,7 +374,12 @@ export class ResultsService {
   // ═══════════════════════════════════════════════════════════════════════════
   //  GET SINGLE RESULT DETAIL
   // ═══════════════════════════════════════════════════════════════════════════
-  async getResultDetail(schoolId: string, resultId: string, userId: string, roles: string[]) {
+  async getResultDetail(
+    schoolId: string,
+    resultId: string,
+    userId: string,
+    roles: string[],
+  ) {
     const [schoolInfo, result] = await Promise.all([
       this.fetchSchoolInfo(schoolId),
       (this.prisma as any).result.findUnique({
@@ -309,7 +394,11 @@ export class ResultsService {
           scores: {
             include: {
               student: {
-                select: { firstName: true, lastName: true, registrationNumber: true },
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  registrationNumber: true,
+                },
               },
             },
             orderBy: { student: { lastName: 'asc' } },
@@ -328,9 +417,13 @@ export class ResultsService {
         select: { id: true, formTeacherArms: true },
       });
       const isOwner = result.teacherId === userId;
-      const isFormTeacher = teacher?.formTeacherArms.includes(result.classArmId);
+      const isFormTeacher = teacher?.formTeacherArms.includes(
+        result.classArmId,
+      );
       if (!isOwner && !isFormTeacher) {
-        throw new ForbiddenException('You do not have permission to view this result.');
+        throw new ForbiddenException(
+          'You do not have permission to view this result.',
+        );
       }
     }
 
@@ -340,8 +433,15 @@ export class ResultsService {
   // ═══════════════════════════════════════════════════════════════════════════
   //  ADMIN: Approve or reject a result
   // ═══════════════════════════════════════════════════════════════════════════
-  async approveResult(schoolId: string, resultId: string, approvedById: string, dto: ApproveResultDto) {
-    const result = await (this.prisma as any).result.findFirst({ where: { id: resultId, schoolId } });
+  async approveResult(
+    schoolId: string,
+    resultId: string,
+    approvedById: string,
+    dto: ApproveResultDto,
+  ) {
+    const result = await (this.prisma as any).result.findFirst({
+      where: { id: resultId, schoolId },
+    });
     if (!result) throw new NotFoundException('Result record not found.');
 
     const [schoolInfo, updated] = await Promise.all([
@@ -350,8 +450,10 @@ export class ResultsService {
         where: { id: resultId },
         data: {
           status: dto.status,
-          approvedById: dto.status === ResultStatus.APPROVED ? approvedById : null,
-          rejectionReason: dto.status === ResultStatus.REJECTED ? dto.rejectionReason : null,
+          approvedById:
+            dto.status === ResultStatus.APPROVED ? approvedById : null,
+          rejectionReason:
+            dto.status === ResultStatus.REJECTED ? dto.rejectionReason : null,
         },
         include: {
           subject: { select: { name: true } },
@@ -391,22 +493,31 @@ export class ResultsService {
       }),
     ]);
 
-    if (!student) throw new NotFoundException('Student not found in this school.');
+    if (!student)
+      throw new NotFoundException('Student not found in this school.');
 
     const resultFilter: any = { schoolId, status: ResultStatus.APPROVED };
 
     if (sessionNameOrId) {
       const session = await (this.prisma as any).academicSession.findFirst({
-        where: { schoolId, OR: [{ id: sessionNameOrId }, { name: sessionNameOrId }] },
+        where: {
+          schoolId,
+          OR: [{ id: sessionNameOrId }, { name: sessionNameOrId }],
+        },
       });
-      if (!session) throw new NotFoundException(`Session "${sessionNameOrId}" not found.`);
+      if (!session)
+        throw new NotFoundException(`Session "${sessionNameOrId}" not found.`);
       resultFilter.sessionId = session.id;
 
       if (termNameOrId && termNameOrId.toLowerCase() !== 'session-wide') {
         const term = await (this.prisma as any).academicTerm.findFirst({
-          where: { sessionId: session.id, OR: [{ id: termNameOrId }, { name: termNameOrId }] },
+          where: {
+            sessionId: session.id,
+            OR: [{ id: termNameOrId }, { name: termNameOrId }],
+          },
         });
-        if (!term) throw new NotFoundException(`Term "${termNameOrId}" not found.`);
+        if (!term)
+          throw new NotFoundException(`Term "${termNameOrId}" not found.`);
         resultFilter.termId = term.id;
       }
     }
@@ -446,10 +557,20 @@ export class ResultsService {
           class: score.result.class,
           classArm: score.result.classArm,
           gradingSystem: gradingSystem
-            ? { passMark: gradingSystem.passMark, grades: gradingSystem.grades, assessments: gradingSystem.assessments }
+            ? {
+                passMark: gradingSystem.passMark,
+                grades: gradingSystem.grades,
+                assessments: gradingSystem.assessments,
+              }
             : null,
           subjects: [],
-          summary: { totalScore: 0, averageScore: 0, subjectsCount: 0, passedCount: 0, failedCount: 0 },
+          summary: {
+            totalScore: 0,
+            averageScore: 0,
+            subjectsCount: 0,
+            passedCount: 0,
+            failedCount: 0,
+          },
         };
       }
 
@@ -504,7 +625,12 @@ export class ResultsService {
         `Student with registration number "${registrationNumber}" not found.`,
       );
     }
-    return this.getStudentResults(schoolId, student.id, sessionNameOrId, termNameOrId);
+    return this.getStudentResults(
+      schoolId,
+      student.id,
+      sessionNameOrId,
+      termNameOrId,
+    );
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -521,26 +647,45 @@ export class ResultsService {
 
     // Resolve session
     const session = await (this.prisma as any).academicSession.findFirst({
-      where: { schoolId, OR: [{ id: sessionNameOrId }, { name: sessionNameOrId }] },
+      where: {
+        schoolId,
+        OR: [{ id: sessionNameOrId }, { name: sessionNameOrId }],
+      },
     });
-    if (!session) throw new NotFoundException(`Session "${sessionNameOrId}" not found.`);
+    if (!session)
+      throw new NotFoundException(`Session "${sessionNameOrId}" not found.`);
 
     // Resolve term
     let termId: string | null = null;
     let termRecord: any = null;
     if (termNameOrId && termNameOrId.toLowerCase() !== 'session-wide') {
       termRecord = await (this.prisma as any).academicTerm.findFirst({
-        where: { sessionId: session.id, OR: [{ id: termNameOrId }, { name: termNameOrId }] },
+        where: {
+          sessionId: session.id,
+          OR: [{ id: termNameOrId }, { name: termNameOrId }],
+        },
       });
-      if (!termRecord) throw new NotFoundException(`Term "${termNameOrId}" not found.`);
+      if (!termRecord)
+        throw new NotFoundException(`Term "${termNameOrId}" not found.`);
       termId = termRecord.id;
     }
 
     // Fetch grading system and raw results in parallel
     const [gradingSystem, rawResults] = await Promise.all([
-      this.gradingService.getGradingSystem(schoolId, session.id, termId || undefined),
+      this.gradingService.getGradingSystem(
+        schoolId,
+        session.id,
+        termId || undefined,
+      ),
       (this.prisma as any).result.findMany({
-        where: { schoolId, classId, classArmId, sessionId: session.id, termId, status: ResultStatus.APPROVED },
+        where: {
+          schoolId,
+          classId,
+          classArmId,
+          sessionId: session.id,
+          termId,
+          status: ResultStatus.APPROVED,
+        },
         include: {
           subject: { select: { name: true, code: true } },
           teacher: { select: { fullName: true } },
@@ -570,16 +715,24 @@ export class ResultsService {
     }));
 
     // ── Per-student aggregate ──────────────────────────────────────────────
-    const studentMap: Record<string, {
-      studentId: string;
-      fullName: string;
-      registrationNumber: string;
-      subjectScores: Array<{ subject: { name: string; code: string | null }; totalScore: number; grade: string | null; remark: string | null }>;
-      totalScore: number;
-      subjectCount: number;
-      passedSubjects: number;
-      failedSubjects: number;
-    }> = {};
+    const studentMap: Record<
+      string,
+      {
+        studentId: string;
+        fullName: string;
+        registrationNumber: string;
+        subjectScores: Array<{
+          subject: { name: string; code: string | null };
+          totalScore: number;
+          grade: string | null;
+          remark: string | null;
+        }>;
+        totalScore: number;
+        subjectCount: number;
+        passedSubjects: number;
+        failedSubjects: number;
+      }
+    > = {};
 
     const passMark = gradingSystem?.passMark ?? 40;
 
@@ -616,9 +769,10 @@ export class ResultsService {
     const students = Object.values(studentMap)
       .map((s) => ({
         ...s,
-        averageScore: s.subjectCount > 0
-          ? parseFloat((s.totalScore / s.subjectCount).toFixed(2))
-          : 0,
+        averageScore:
+          s.subjectCount > 0
+            ? parseFloat((s.totalScore / s.subjectCount).toFixed(2))
+            : 0,
       }))
       .sort((a, b) => b.totalScore - a.totalScore)
       .map((s, idx) => ({ ...s, overallRank: idx + 1 }));
@@ -630,7 +784,11 @@ export class ResultsService {
       class: rawResults[0]?.class ?? null,
       classArm: rawResults[0]?.classArm ?? null,
       gradingSystem: gradingSystem
-        ? { passMark: gradingSystem.passMark, grades: gradingSystem.grades, assessments: gradingSystem.assessments }
+        ? {
+            passMark: gradingSystem.passMark,
+            grades: gradingSystem.grades,
+            assessments: gradingSystem.assessments,
+          }
         : null,
       subjects,
       students,

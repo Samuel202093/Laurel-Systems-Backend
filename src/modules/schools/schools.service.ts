@@ -1,14 +1,19 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateSchoolDto } from './dto/create-school.dto';
 import { OtpService } from '../auth/otp.service';
 import { ClassesService } from '../classes/classes.service';
-import { 
-  UpdateCalendarDto, 
-  UpdateGradingDto, 
-  UpdateLocationDto, 
-  UpdatePreferencesDto, 
-  UpdateBrandingDto 
+import {
+  UpdateCalendarDto,
+  UpdateGradingDto,
+  UpdateLocationDto,
+  UpdatePreferencesDto,
+  UpdateBrandingDto,
 } from './dto/settings.dto';
 import * as bcrypt from 'bcrypt';
 
@@ -26,17 +31,16 @@ export class SchoolsService {
   private mapToPrismaUserRole(role: string): any {
     const roleMap: Record<string, string> = {
       'school owner': 'SCHOOL_OWNER',
-      'director': 'DIRECTOR',
-      'principal': 'PRINCIPAL',
-      'teacher': 'TEACHER',
+      director: 'DIRECTOR',
+      principal: 'PRINCIPAL',
+      teacher: 'TEACHER',
       'ICT admin': 'ICT_ADMIN',
-      'others': 'OTHERS',
+      others: 'OTHERS',
     };
     return roleMap[role] || 'OTHERS';
   }
 
   async registerSchool(dto: CreateSchoolDto) {
-    
     // 1. Verify OTP first
     await this.otpService.verifyOtp(dto.email, dto.otpCode);
 
@@ -85,10 +89,12 @@ export class SchoolsService {
       });
 
       if (progress && progress.data) {
-        const onboardingData = progress.data as any;
+        const onboardingData = progress.data;
         // Check if class setup is directly in data or under a key
-        const classSetup = onboardingData.classLevel ? onboardingData : onboardingData.classSetup;
-        
+        const classSetup = onboardingData.classLevel
+          ? onboardingData
+          : onboardingData.classSetup;
+
         if (classSetup && classSetup.classLevel) {
           await this.classesService.saveClassSetup(school.id, classSetup, tx);
         }
@@ -132,7 +138,9 @@ export class SchoolsService {
     });
 
     if (!admin) {
-      throw new NotFoundException(`No school found for the provided email: ${email}`);
+      throw new NotFoundException(
+        `No school found for the provided email: ${email}`,
+      );
     }
 
     return admin.schoolId;
@@ -141,7 +149,7 @@ export class SchoolsService {
   // Multi-step onboarding progress tracking
   // async saveOnboardingProgress(email: string, step: number, data: any) {
   //   this.logger.log(`Saving onboarding progress for ${email} at step ${step}`);
-    
+
   //   const progress = await (this.prisma as any).onboardingProgress.upsert({
   //     where: { email },
   //     update: { step, data },
@@ -151,24 +159,48 @@ export class SchoolsService {
   //   return progress;
   // }
 
+  async saveOnboardingProgress(email: string, step: number, data: any) {
+    this.logger.log(`Saving onboarding progress for ${email} at step ${step}`);
 
-async saveOnboardingProgress(email: string, step: number, data: any) {
-  this.logger.log(`Saving onboarding progress for ${email} at step ${step}`);
+    // When saving step 2, check if email already exists before sending OTP
+    if (step === 2) {
+      // Check all user tables
+      const [
+        existingSuperAdmin,
+        existingSchoolAdmin,
+        existingTeacher,
+        existingStudent,
+      ] = await Promise.all([
+        this.prisma.superAdmin.findUnique({ where: { email } }),
+        this.prisma.schoolAdmin.findUnique({ where: { email } }),
+        this.prisma.teacher.findUnique({ where: { email } }),
+        this.prisma.student.findFirst({ where: { email } }),
+      ]);
 
-  const progress = await (this.prisma as any).onboardingProgress.upsert({
-    where: { email },
-    update: { step, data },
-    create: { email, step, data },
-  });
+      if (
+        existingSuperAdmin ||
+        existingSchoolAdmin ||
+        existingTeacher ||
+        existingStudent
+      ) {
+        throw new BadRequestException('Email already exists');
+      }
+    }
 
-  // When saving step 2, generate and send the OTP immediately
-  if (step === 2) {
-    const otpResult = await this.otpService.sendOtp(email);
-    return { ...progress, otpInfo: otpResult };
+    const progress = await (this.prisma as any).onboardingProgress.upsert({
+      where: { email },
+      update: { step, data },
+      create: { email, step, data },
+    });
+
+    // When saving step 2, generate and send the OTP immediately
+    if (step === 2) {
+      const otpResult = await this.otpService.sendOtp(email);
+      return { ...progress, otpInfo: otpResult };
+    }
+
+    return progress;
   }
-
-  return progress;
-}
 
   async getOnboardingProgress(email: string) {
     const progress = await (this.prisma as any).onboardingProgress.findUnique({
@@ -176,7 +208,9 @@ async saveOnboardingProgress(email: string, step: number, data: any) {
     });
 
     if (!progress) {
-      throw new NotFoundException(`No onboarding progress found for email: ${email}`);
+      throw new NotFoundException(
+        `No onboarding progress found for email: ${email}`,
+      );
     }
 
     return progress;
@@ -184,13 +218,17 @@ async saveOnboardingProgress(email: string, step: number, data: any) {
 
   async clearOnboardingProgress(email: string) {
     // Also clear OTPs for this email
-    await (this.prisma as any).otp.deleteMany({
-      where: { email },
-    }).catch(() => null);
+    await (this.prisma as any).otp
+      .deleteMany({
+        where: { email },
+      })
+      .catch(() => null);
 
-    return (this.prisma as any).onboardingProgress.delete({
-      where: { email },
-    }).catch(() => null); // Ignore if not found
+    return (this.prisma as any).onboardingProgress
+      .delete({
+        where: { email },
+      })
+      .catch(() => null); // Ignore if not found
   }
 
   // ─── SYSTEM SETTINGS ──────────────────────────────────────────────────────
@@ -230,18 +268,22 @@ async saveOnboardingProgress(email: string, step: number, data: any) {
       // 2. Activate the selected session and term
       await tx.academicSession.update({
         where: { id: dto.sessionId },
-        data: { 
+        data: {
           isActive: true,
-          ...(dto.resumptionDate && { startDate: new Date(dto.resumptionDate) }),
+          ...(dto.resumptionDate && {
+            startDate: new Date(dto.resumptionDate),
+          }),
           ...(dto.closingDate && { endDate: new Date(dto.closingDate) }),
         },
       });
 
       await tx.academicTerm.update({
         where: { id: dto.termId },
-        data: { 
+        data: {
           isActive: true,
-          ...(dto.resumptionDate && { startDate: new Date(dto.resumptionDate) }),
+          ...(dto.resumptionDate && {
+            startDate: new Date(dto.resumptionDate),
+          }),
           ...(dto.closingDate && { endDate: new Date(dto.closingDate) }),
         },
       });
@@ -256,7 +298,9 @@ async saveOnboardingProgress(email: string, step: number, data: any) {
     });
 
     if (!activeSession) {
-      throw new BadRequestException('No active academic session found. Please set the academic calendar first.');
+      throw new BadRequestException(
+        'No active academic session found. Please set the academic calendar first.',
+      );
     }
 
     return (this.prisma as any).$transaction(async (tx: any) => {

@@ -19,7 +19,7 @@ class NextOfKinDto {
 
   @ApiProperty({ example: 'Doe' })
   @IsString()
- @IsOptional()
+  @IsOptional()
   surname?: string;
 
   @ApiProperty({ example: 'Smith', required: false })
@@ -119,7 +119,11 @@ export class CreateTeacherDto {
   @IsNotEmpty()
   address: string;
 
-  @ApiProperty({ type: [String], example: ['Mathematics', 'Further Mathematics'], required: false })
+  @ApiProperty({
+    type: [String],
+    example: ['Mathematics', 'Further Mathematics'],
+    required: false,
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()

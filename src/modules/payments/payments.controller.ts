@@ -17,9 +17,17 @@ import {
 } from '@nestjs/common';
 import { Response, Request } from 'express';
 import { PaymentsService } from './payments.service';
-import { InitiatePaymentDto, VerifyPaymentDto } from './dto/initiate-payment.dto';
+import {
+  InitiatePaymentDto,
+  VerifyPaymentDto,
+} from './dto/initiate-payment.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 
 @ApiTags('Payments')
 @Controller('payments')
@@ -29,7 +37,10 @@ export class PaymentsController {
 
   @Post('initiate')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Initiate a payment — returns paymentUrl for card or virtualAccount for bank transfer' })
+  @ApiOperation({
+    summary:
+      'Initiate a payment — returns paymentUrl for card or virtualAccount for bank transfer',
+  })
   async initiate(@Body() dto: InitiatePaymentDto, @Res() res: Response) {
     const data = await this.paymentsService.initiatePayment(dto);
     return res.status(HttpStatus.OK).json({
@@ -41,28 +52,42 @@ export class PaymentsController {
 
   @Post('verify')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Verify a payment — useful for card payments after redirect' })
+  @ApiOperation({
+    summary: 'Verify a payment — useful for card payments after redirect',
+  })
   async verify(@Body() dto: VerifyPaymentDto, @Res() res: Response) {
     const result = await this.paymentsService.verifyPayment(dto);
     return res.status(HttpStatus.OK).json({
       statusCode: HttpStatus.OK,
-      message: result.status === 'success' ? 'Payment verified' : 'Payment failed',
+      message:
+        result.status === 'success' ? 'Payment verified' : 'Payment failed',
       data: result,
     });
   }
 
   @Get('outstanding/:studentId')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Get all outstanding fees for a student — use this to build the payment page' })
-  async getOutstanding(@Param('studentId') studentId: string, @Res() res: Response) {
+  @ApiOperation({
+    summary:
+      'Get all outstanding fees for a student — use this to build the payment page',
+  })
+  async getOutstanding(
+    @Param('studentId') studentId: string,
+    @Res() res: Response,
+  ) {
     const data = await this.paymentsService.getStudentOutstanding(studentId);
     return res.status(HttpStatus.OK).json({ statusCode: HttpStatus.OK, data });
   }
 
   @Get('receipt/:receiptNumber')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Get receipt with full fee breakdown including charges' })
-  async getReceipt(@Param('receiptNumber') receiptNumber: string, @Res() res: Response) {
+  @ApiOperation({
+    summary: 'Get receipt with full fee breakdown including charges',
+  })
+  async getReceipt(
+    @Param('receiptNumber') receiptNumber: string,
+    @Res() res: Response,
+  ) {
     const data = await this.paymentsService.getReceipt(receiptNumber);
     return res.status(HttpStatus.OK).json({ statusCode: HttpStatus.OK, data });
   }
@@ -78,7 +103,11 @@ export class PaymentsController {
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Res() res: Response,
   ) {
-    const data = await this.paymentsService.getStudentHistory(studentId, page, limit);
+    const data = await this.paymentsService.getStudentHistory(
+      studentId,
+      page,
+      limit,
+    );
     return res.status(HttpStatus.OK).json({ statusCode: HttpStatus.OK, data });
   }
 
@@ -96,7 +125,9 @@ export class PaymentsController {
   // Or with the global rawBody middleware package: npm i nestjs-raw-body
 
   @Post('webhook/:processor')
-  @ApiOperation({ summary: 'Webhook endpoint for payment processors — do not call directly' })
+  @ApiOperation({
+    summary: 'Webhook endpoint for payment processors — do not call directly',
+  })
   async handleWebhook(
     @Param('processor') processor: string,
     @Body() body: any,
@@ -109,11 +140,12 @@ export class PaymentsController {
     res.status(HttpStatus.OK).send('OK');
 
     // Process after response is sent (fire-and-forget with error handling inside)
-    const rawBody: Buffer = (req as any).rawBody ?? Buffer.from(JSON.stringify(body));
-    this.paymentsService.handleWebhook(processor, body, rawBody, headers).catch(err => {
-      // Error is already logged inside the service — just swallow here
-    });
+    const rawBody: Buffer =
+      (req as any).rawBody ?? Buffer.from(JSON.stringify(body));
+    this.paymentsService
+      .handleWebhook(processor, body, rawBody, headers)
+      .catch((err) => {
+        // Error is already logged inside the service — just swallow here
+      });
   }
 }
-
-

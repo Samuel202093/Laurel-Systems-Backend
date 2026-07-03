@@ -31,7 +31,9 @@ export class R2Service {
         },
         (error, result: UploadApiResponse) => {
           if (error) {
-            this.logger.error(`Error uploading file to Cloudinary: ${error.message}`);
+            this.logger.error(
+              `Error uploading file to Cloudinary: ${error.message}`,
+            );
             return reject(error);
           }
           this.logger.log(`File uploaded successfully: ${result.secure_url}`);
@@ -55,7 +57,10 @@ export class R2Service {
       await cloudinary.uploader.destroy(key, { resource_type: 'raw' });
       this.logger.log(`File deleted successfully: ${key}`);
     } catch (error) {
-      this.logger.error(`Error deleting file from Cloudinary: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error deleting file from Cloudinary: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }

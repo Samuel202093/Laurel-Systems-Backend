@@ -1,8 +1,16 @@
-import { Injectable, NotFoundException, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { MailService } from '../mail/mail.service';
-import { CreateAssignmentDto, UpdateAssignmentDto } from './dto/create-assignment.dto';
+import {
+  CreateAssignmentDto,
+  UpdateAssignmentDto,
+} from './dto/create-assignment.dto';
 
 @Injectable()
 export class AssignmentsService {
@@ -22,7 +30,9 @@ export class AssignmentsService {
 
       // Resolve subjectId if not provided
       if (!subjectId && subjectName) {
-        this.logger.log(`Attempting to resolve subjectId for name: ${subjectName} in school: ${schoolId}`);
+        this.logger.log(
+          `Attempting to resolve subjectId for name: ${subjectName} in school: ${schoolId}`,
+        );
         const subject = await (this.prisma as any).subject.findFirst({
           where: { schoolId, name: subjectName },
         });
@@ -32,7 +42,9 @@ export class AssignmentsService {
 
       // Resolve classId if not provided
       if (!classId && className) {
-        this.logger.log(`Attempting to resolve classId for name: ${className} in school: ${schoolId}`);
+        this.logger.log(
+          `Attempting to resolve classId for name: ${className} in school: ${schoolId}`,
+        );
         const classData = await (this.prisma as any).class.findFirst({
           where: { schoolId, name: className },
         });
@@ -44,22 +56,29 @@ export class AssignmentsService {
       let fileKey: string | null = null;
 
       if (file) {
-        this.logger.log(`Step 2: Uploading file - ${file.originalname}, mimetype: ${file.mimetype}, size: ${file.size}`);
+        this.logger.log(
+          `Step 2: Uploading file - ${file.originalname}, mimetype: ${file.mimetype}, size: ${file.size}`,
+        );
         const folder = `schools/${dto.schoolId}/assignments/${subjectId || subjectName}`;
-        const uploadResult = await this.cloudinaryService.uploadFile(file, folder);
+        const uploadResult = await this.cloudinaryService.uploadFile(
+          file,
+          folder,
+        );
         fileUrl = uploadResult.secure_url;
         fileKey = uploadResult.public_id;
-        this.logger.log(`Step 3: File uploaded - ${fileUrl}, public_id: ${fileKey}`);
+        this.logger.log(
+          `Step 3: File uploaded - ${fileUrl}, public_id: ${fileKey}`,
+        );
       }
 
       this.logger.log('Step 4: Creating assignment in DB...');
-      const { 
-        schoolId: _schoolId, 
-        teacherId: _teacherId, 
-        subjectId: _subjectId, 
-        classId: _classId, 
+      const {
+        schoolId: _schoolId,
+        teacherId: _teacherId,
+        subjectId: _subjectId,
+        classId: _classId,
         dueDate: _dueDate,
-        ...restDto 
+        ...restDto
       } = dto;
 
       const assignment = await (this.prisma as any).assignment.create({
@@ -85,7 +104,10 @@ export class AssignmentsService {
 
       return assignment;
     } catch (error) {
-      this.logger.error(`Failed to create assignment: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create assignment: ${error.message}`,
+        error.stack,
+      );
       throw new InternalServerErrorException('Could not create assignment');
     }
   }
@@ -150,7 +172,11 @@ export class AssignmentsService {
     );
   }
 
-  async updateAssignment(id: string, dto: UpdateAssignmentDto, file?: Express.Multer.File) {
+  async updateAssignment(
+    id: string,
+    dto: UpdateAssignmentDto,
+    file?: Express.Multer.File,
+  ) {
     const assignment = await (this.prisma as any).assignment.findUnique({
       where: { id },
     });
@@ -185,7 +211,10 @@ export class AssignmentsService {
         }
 
         const folder = `schools/${assignment.schoolId}/assignments/${subjectId || assignment.subjectName}`;
-        const uploadResult = await this.cloudinaryService.uploadFile(file, folder);
+        const uploadResult = await this.cloudinaryService.uploadFile(
+          file,
+          folder,
+        );
         fileUrl = uploadResult.secure_url;
         fileKey = uploadResult.public_id;
       }
@@ -214,7 +243,10 @@ export class AssignmentsService {
         },
       });
     } catch (error) {
-      this.logger.error(`Failed to update assignment: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update assignment: ${error.message}`,
+        error.stack,
+      );
       throw new InternalServerErrorException('Could not update assignment');
     }
   }
@@ -237,7 +269,10 @@ export class AssignmentsService {
         where: { id },
       });
     } catch (error) {
-      this.logger.error(`Failed to delete assignment: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to delete assignment: ${error.message}`,
+        error.stack,
+      );
       throw new InternalServerErrorException('Could not delete assignment');
     }
   }

@@ -39,7 +39,15 @@ export class FeesController {
   // ─── Diagnostic ──────────────────────────────────────────────────────────
 
   @Get('debug')
-  @Roles('SCHOOL_OWNER', 'DIRECTOR', 'PRINCIPAL', 'ICT_ADMIN', 'TEACHER', 'STUDENT', 'SCHOOL_ADMIN')
+  @Roles(
+    'SCHOOL_OWNER',
+    'DIRECTOR',
+    'PRINCIPAL',
+    'ICT_ADMIN',
+    'TEACHER',
+    'STUDENT',
+    'SCHOOL_ADMIN',
+  )
   debug() {
     return { status: 'ok', message: 'FeesController is reachable' };
   }
@@ -47,9 +55,23 @@ export class FeesController {
   // ─── Student specific fees ──────────────────────────────────────────────
 
   @Get('student/:studentId')
-  @Roles('STUDENT', 'SCHOOL_OWNER', 'DIRECTOR', 'PRINCIPAL', 'ICT_ADMIN', 'SCHOOL_ADMIN')
-  @ApiOperation({ summary: 'Get all fees applicable to a specific student based on their class' })
-  async findFeesForStudent(@Param('studentId') studentId: string, @Req() req: any, @Res() res: Response) {
+  @Roles(
+    'STUDENT',
+    'SCHOOL_OWNER',
+    'DIRECTOR',
+    'PRINCIPAL',
+    'ICT_ADMIN',
+    'SCHOOL_ADMIN',
+  )
+  @ApiOperation({
+    summary:
+      'Get all fees applicable to a specific student based on their class',
+  })
+  async findFeesForStudent(
+    @Param('studentId') studentId: string,
+    @Req() req: any,
+    @Res() res: Response,
+  ) {
     const schoolId = req.user.schoolId;
     const data = await this.feesService.findFeesForStudent(studentId, schoolId);
     return res.status(HttpStatus.OK).json({
@@ -64,7 +86,11 @@ export class FeesController {
   @Post()
   @Roles('SCHOOL_OWNER', 'DIRECTOR', 'PRINCIPAL', 'ICT_ADMIN', 'SCHOOL_ADMIN')
   @ApiOperation({ summary: 'Create a new fee configuration' })
-  async create(@Body() dto: CreateFeeDto, @Req() req: any, @Res() res: Response) {
+  async create(
+    @Body() dto: CreateFeeDto,
+    @Req() req: any,
+    @Res() res: Response,
+  ) {
     // Ensure schoolId matches user's school or user is Super Admin
     const schoolId = req.user.schoolId || dto.schoolId;
     const data = await this.feesService.create({ ...dto, schoolId });
@@ -78,7 +104,15 @@ export class FeesController {
   // ─── List by school ────────────────────────────────────────────────────────
 
   @Get('school/:schoolId')
-  @Roles('SCHOOL_OWNER', 'DIRECTOR', 'PRINCIPAL', 'ICT_ADMIN', 'TEACHER', 'STUDENT', 'SCHOOL_ADMIN')
+  @Roles(
+    'SCHOOL_OWNER',
+    'DIRECTOR',
+    'PRINCIPAL',
+    'ICT_ADMIN',
+    'TEACHER',
+    'STUDENT',
+    'SCHOOL_ADMIN',
+  )
   @ApiOperation({ summary: 'Get all fee configurations for a school' })
   async findAllBySchool(
     @Param('schoolId') schoolId: string,
@@ -102,9 +136,21 @@ export class FeesController {
   // ─── Get one ──────────────────────────────────────────────────────────────
 
   @Get(':id')
-  @Roles('SCHOOL_OWNER', 'DIRECTOR', 'PRINCIPAL', 'ICT_ADMIN', 'TEACHER', 'STUDENT', 'SCHOOL_ADMIN')
+  @Roles(
+    'SCHOOL_OWNER',
+    'DIRECTOR',
+    'PRINCIPAL',
+    'ICT_ADMIN',
+    'TEACHER',
+    'STUDENT',
+    'SCHOOL_ADMIN',
+  )
   @ApiOperation({ summary: 'Get a single fee configuration by ID' })
-  async findOne(@Param('id') id: string, @Req() req: any, @Res() res: Response) {
+  async findOne(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Res() res: Response,
+  ) {
     const schoolId = req.user.schoolId;
     const data = await this.feesService.findOne(id, schoolId);
     return res.status(HttpStatus.OK).json({

@@ -26,7 +26,20 @@ export class CreateFeeDto {
   @IsNotEmpty()
   feeName: string;
 
-  @ApiProperty({ example: ['Tuition'], enum: ['Tuition', 'Exam', 'PTA', 'Lab', 'Sports', 'Uniform', 'Books', 'Other'], isArray: true })
+  @ApiProperty({
+    example: ['Tuition'],
+    enum: [
+      'Tuition',
+      'Exam',
+      'PTA',
+      'Lab',
+      'Sports',
+      'Uniform',
+      'Books',
+      'Other',
+    ],
+    isArray: true,
+  })
   @IsArray()
   @IsString({ each: true })
   @ArrayMinSize(1)
@@ -37,7 +50,10 @@ export class CreateFeeDto {
   @IsNotEmpty()
   session: string;
 
-  @ApiProperty({ example: 'First Term', enum: ['First Term', 'Second Term', 'Third Term'] })
+  @ApiProperty({
+    example: 'First Term',
+    enum: ['First Term', 'Second Term', 'Third Term'],
+  })
   @IsString()
   @IsIn(['First Term', 'Second Term', 'Third Term'])
   term: string;
@@ -53,22 +69,37 @@ export class CreateFeeDto {
   @IsNotEmpty()
   currency: string;
 
-  @ApiProperty({ example: ['JSS 1', 'JSS 2'], description: 'Class labels this fee targets', isArray: true })
+  @ApiProperty({
+    example: ['JSS 1', 'JSS 2'],
+    description: 'Class labels this fee targets',
+    isArray: true,
+  })
   @IsArray()
   @ArrayMinSize(1)
   @IsString({ each: true })
   applicableClasses: string[];
 
-  @ApiProperty({ example: '2025-11-30', description: 'ISO date string for payment deadline' })
+  @ApiProperty({
+    example: '2025-11-30',
+    description: 'ISO date string for payment deadline',
+  })
   @IsDateString()
   dueDate: string;
 
-  @ApiProperty({ example: 'full', enum: ['full', 'installments'], default: 'full' })
+  @ApiProperty({
+    example: 'full',
+    enum: ['full', 'installments'],
+    default: 'full',
+  })
   @IsString()
   @IsIn(['full', 'installments'])
   paymentPlan: string;
 
-  @ApiPropertyOptional({ example: 3, description: 'Max installment count (2–5). Required when paymentPlan=installments' })
+  @ApiPropertyOptional({
+    example: 3,
+    description:
+      'Max installment count (2–5). Required when paymentPlan=installments',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -81,7 +112,11 @@ export class CreateFeeDto {
   @IsString()
   notes?: string;
 
-  @ApiPropertyOptional({ example: ['acc-id-1', 'acc-id-2'], description: 'Array of bank account IDs', isArray: true })
+  @ApiPropertyOptional({
+    example: ['acc-id-1', 'acc-id-2'],
+    description: 'Array of bank account IDs',
+    isArray: true,
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()

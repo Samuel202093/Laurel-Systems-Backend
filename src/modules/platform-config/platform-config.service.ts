@@ -1,18 +1,25 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreatePlatformConfigDto, UpdatePlatformConfigDto } from './dto/platform-config.dto';
-
+import {
+  CreatePlatformConfigDto,
+  UpdatePlatformConfigDto,
+} from './dto/platform-config.dto';
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes — changes reflect quickly without hammering DB
-const FALLBACK_FLAT_KOBO = 50_000;   // ₦500 hardcoded fallback
+const FALLBACK_FLAT_KOBO = 50_000; // ₦500 hardcoded fallback
 
 export interface PlatformChargeConfig {
   id: string;
-  schoolId: string | null;        // null = global default
+  schoolId: string | null; // null = global default
   flatKobo: number;
-  percentageBps: number;          // basis points: 100 = 1%
-  capKobo: number;                // 0 = no cap
-  minimumKobo: number;            // 0 = no minimum
+  percentageBps: number; // basis points: 100 = 1%
+  capKobo: number; // 0 = no cap
+  minimumKobo: number; // 0 = no minimum
   description: string;
   isActive: boolean;
 }
@@ -21,10 +28,10 @@ export interface ChargeBreakdown {
   principalKobo: number;
   platformFlatKobo: number;
   platformPercentKobo: number;
-  platformTotalKobo: number;     // what you earn
-  gatewayFeeKobo: number;        // what processor earns
-  studentPaysKobo: number;       // total charged to student
-  schoolReceivesKobo: number;    // what school gets net of gateway fee
+  platformTotalKobo: number; // what you earn
+  gatewayFeeKobo: number; // what processor earns
+  studentPaysKobo: number; // total charged to student
+  schoolReceivesKobo: number; // what school gets net of gateway fee
 }
 
 @Injectable()
@@ -32,18 +39,27 @@ export class PlatformConfigService {
   private readonly logger = new Logger(PlatformConfigService.name);
 
   // In-memory cache: key = schoolId (or '__global__' for default)
-  private cache = new Map<string, { config: PlatformChargeConfig; expiresAt: number }>();
+  private cache = new Map<
+    string,
+    { config: PlatformChargeConfig; expiresAt: number }
+  >();
 
   constructor(private readonly prisma: PrismaService) {}
 
   // ─── Charge calculation ────────────────────────────────────────────────────
 
-  async calculatePlatformCharge(principalKobo: number, schoolId: string): Promise<number> {
+  async calculatePlatformCharge(
+    principalKobo: number,
+    schoolId: string,
+  ): Promise<number> {
     const config = await this.getEffectiveConfig(schoolId);
     return this.applyChargeFormula(principalKobo, config);
   }
 
-  applyChargeFormula(principalKobo: number, config: PlatformChargeConfig): number {
+  applyChargeFormula(
+    principalKobo: number,
+    config: PlatformChargeConfig,
+  ): number {
     const flat = config.flatKobo;
     const pct = Math.ceil((principalKobo * config.percentageBps) / 10_000);
     let total = flat + pct;
@@ -65,16 +81,16 @@ export class PlatformConfigService {
     const flat = config.flatKobo;
     const pct = Math.ceil((principalKobo * config.percentageBps) / 10_000);
     let platformTotal = flat + pct;
-    if (config.capKobo > 0)     platformTotal = Math.min(platformTotal, config.capKobo);
-    if (config.minimumKobo > 0) platformTotal = Math.max(platformTotal, config.minimumKobo);
+    if (config.capKobo > 0)
+      platformTotal = Math.min(platformTotal, config.capKobo);
+    if (config.minimumKobo > 0)
+      platformTotal = Math.max(platformTotal, config.minimumKobo);
 
-    const studentPaysKobo = principalKobo
-      + platformTotal
-      + (absorbGateway ? 0 : gatewayFeeKobo);
+    const studentPaysKobo =
+      principalKobo + platformTotal + (absorbGateway ? 0 : gatewayFeeKobo);
 
-    const schoolReceivesKobo = principalKobo
-      + platformTotal
-      - (absorbGateway ? gatewayFeeKobo : 0);
+    const schoolReceivesKobo =
+      principalKobo + platformTotal - (absorbGateway ? gatewayFeeKobo : 0);
 
     return {
       principalKobo,
@@ -103,7 +119,10 @@ export class PlatformConfigService {
 
     if (schoolConfig) {
       const config = this.mapToConfig(schoolConfig);
-      this.cache.set(schoolId, { config, expiresAt: Date.now() + CACHE_TTL_MS });
+      this.cache.set(schoolId, {
+        config,
+        expiresAt: Date.now() + CACHE_TTL_MS,
+      });
       return config;
     }
 
@@ -120,12 +139,17 @@ export class PlatformConfigService {
 
     if (globalConfig) {
       const config = this.mapToConfig(globalConfig);
-      this.cache.set('__global__', { config, expiresAt: Date.now() + CACHE_TTL_MS });
+      this.cache.set('__global__', {
+        config,
+        expiresAt: Date.now() + CACHE_TTL_MS,
+      });
       return config;
     }
 
     // 5. Hardcoded fallback (logs a warning — super-admin should set a config)
-    this.logger.warn('No platform config found in DB — using hardcoded fallback of ₦500 flat');
+    this.logger.warn(
+      'No platform config found in DB — using hardcoded fallback of ₦500 flat',
+    );
     return {
       id: 'fallback',
       schoolId: null,
@@ -140,7 +164,9 @@ export class PlatformConfigService {
 
   // ─── Admin CRUD ────────────────────────────────
 
-  async createConfig(dto: CreatePlatformConfigDto): Promise<PlatformChargeConfig> {
+  async createConfig(
+    dto: CreatePlatformConfigDto,
+  ): Promise<PlatformChargeConfig> {
     this.validateConfigDto(dto);
 
     // If creating a new active config for this scope, deactivate the old one
@@ -167,12 +193,17 @@ export class PlatformConfigService {
     return this.mapToConfig(record);
   }
 
-  async updateConfig(id: string, dto: UpdatePlatformConfigDto): Promise<PlatformChargeConfig> {
-    const existing = await (this.prisma as any).platformConfig.findUnique({ where: { id } });
+  async updateConfig(
+    id: string,
+    dto: UpdatePlatformConfigDto,
+  ): Promise<PlatformChargeConfig> {
+    const existing = await (this.prisma as any).platformConfig.findUnique({
+      where: { id },
+    });
     if (!existing) throw new NotFoundException('Platform config not found');
 
     if (dto.flatKobo !== undefined || dto.percentageBps !== undefined) {
-      this.validateConfigDto({ ...existing, ...dto } as any);
+      this.validateConfigDto({ ...existing, ...dto });
     }
 
     // If activating this config, deactivate others in same scope
@@ -200,13 +231,17 @@ export class PlatformConfigService {
   }
 
   async getConfigById(id: string) {
-    const config = await (this.prisma as any).platformConfig.findUnique({ where: { id } });
+    const config = await (this.prisma as any).platformConfig.findUnique({
+      where: { id },
+    });
     if (!config) throw new NotFoundException('Platform config not found');
     return config;
   }
 
   async deleteConfig(id: string) {
-    const existing = await (this.prisma as any).platformConfig.findUnique({ where: { id } });
+    const existing = await (this.prisma as any).platformConfig.findUnique({
+      where: { id },
+    });
     if (!existing) throw new NotFoundException('Platform config not found');
     await (this.prisma as any).platformConfig.delete({ where: { id } });
     this.invalidateCache(existing.schoolId);
@@ -237,7 +272,9 @@ export class PlatformConfigService {
 
   private validateConfigDto(dto: Partial<CreatePlatformConfigDto>) {
     if ((dto.flatKobo ?? 0) === 0 && (dto.percentageBps ?? 0) === 0) {
-      throw new BadRequestException('Platform config must have either a flat fee or a percentage (or both)');
+      throw new BadRequestException(
+        'Platform config must have either a flat fee or a percentage (or both)',
+      );
     }
     if ((dto.percentageBps ?? 0) > 10_000) {
       throw new BadRequestException('percentageBps cannot exceed 10000 (100%)');

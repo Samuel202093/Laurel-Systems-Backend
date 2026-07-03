@@ -7,7 +7,12 @@ import { PlatformConfigModule } from '../platform-config/platform-config.module'
 import { PlatformPayoutModule } from '../platform-payout/platform-payout.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, PlatformConfigModule, PlatformPayoutModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    PlatformConfigModule,
+    PlatformPayoutModule,
+  ],
   controllers: [PaymentsController],
   providers: [PaymentsService],
   exports: [PaymentsService],

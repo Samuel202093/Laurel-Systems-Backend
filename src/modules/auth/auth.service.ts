@@ -36,7 +36,10 @@ export class AuthService {
     const { user, systemRole, subRole, roles } = resolved;
 
     // 2. Constant-time password comparison (prevents timing-based enumeration).
-    const isPasswordValid = await bcrypt.compare(password, user.password as string);
+    const isPasswordValid = await bcrypt.compare(
+      password,
+      user.password as string,
+    );
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -93,7 +96,9 @@ export class AuthService {
     });
 
     if (!student) {
-      throw new UnauthorizedException('Invalid registration number or password');
+      throw new UnauthorizedException(
+        'Invalid registration number or password',
+      );
     }
 
     // 2. Check if student is active
@@ -104,7 +109,9 @@ export class AuthService {
     // 3. Constant-time password comparison
     const isPasswordValid = await bcrypt.compare(password, student.password);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid registration number or password');
+      throw new UnauthorizedException(
+        'Invalid registration number or password',
+      );
     }
 
     // 4. Build JWT payload
@@ -291,8 +298,8 @@ export class AuthService {
         phone: true,
         gender: true,
         password: true,
-        role: true,       // SchoolAdminRole enum — fine-grained position
-        roles: true,      // roles array
+        role: true, // SchoolAdminRole enum — fine-grained position
+        roles: true, // roles array
         isActive: true,
         avatar: true,
         schoolId: true,

@@ -9,6 +9,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { PayoutStatus, PayoutMethod, SweepResult } from './types';
+import { PlatformPayout } from '@prisma/client';
 
 @Injectable()
 export class PlatformPayoutService {
@@ -33,7 +34,7 @@ export class PlatformPayoutService {
   }): Promise<void> {
     const isNativeSplit = this.supportsNativeSplit(params.processor);
 
-    await (this.prisma as any).platformPayout.create({
+    await this.prisma.platformPayout.create({
       data: {
         transactionId: params.transactionId,
         schoolId: params.schoolId,
@@ -43,13 +44,15 @@ export class PlatformPayoutService {
         platformPercentKobo: params.platformPercentKobo,
         gatewayFeeKobo: params.gatewayFeeKobo,
         status: isNativeSplit ? PayoutStatus.AUTO_SPLIT : PayoutStatus.PENDING,
-        method: isNativeSplit ? PayoutMethod.GATEWAY_SPLIT : PayoutMethod.MANUAL_TRANSFER,
+        method: isNativeSplit
+          ? PayoutMethod.GATEWAY_SPLIT
+          : PayoutMethod.MANUAL_TRANSFER,
       },
     });
 
     this.logger.log(
       `Payout record created for transaction ${params.transactionId} — ` +
-      `${isNativeSplit ? 'AUTO_SPLIT (gateway handles it)' : 'PENDING manual transfer'}`,
+        `${isNativeSplit ? 'AUTO_SPLIT (gateway handles it)' : 'PENDING manual transfer'}`,
     );
   }
 
@@ -61,8 +64,11 @@ export class PlatformPayoutService {
   async sweepPendingPayouts(): Promise<SweepResult> {
     this.logger.log('Starting payout sweep...');
 
-    const pending = await (this.prisma as any).platformPayout.findMany({
-      where: { status: PayoutStatus.PENDING, method: PayoutMethod.MANUAL_TRANSFER },
+    const pending = await this.prisma.platformPayout.findMany({
+      where: {
+        status: PayoutStatus.PENDING,
+        method: PayoutMethod.MANUAL_TRANSFER,
+      },
       orderBy: { createdAt: 'asc' },
     });
 
@@ -74,26 +80,32 @@ export class PlatformPayoutService {
     this.logger.log(`Found ${pending.length} pending payout(s)`);
 
     // Group by processor so we can batch transfers
-    const byProcessor = pending.reduce((acc, p) => {
-      const proc = p.processor as string;
-      if (!acc[proc]) acc[proc] = [];
-      acc[proc].push(p);
-      return acc;
-    }, {} as Record<string, any[]>);
+    const byProcessor = pending.reduce(
+      (acc, p) => {
+        const proc = p.processor as string;
+        if (!acc[proc]) acc[proc] = [];
+        acc[proc].push(p);
+        return acc;
+      },
+      {} as Record<string, PlatformPayout[]>,
+    );
 
     let swept = 0;
     let failed = 0;
     let totalKobo = 0;
 
-    for (const [processor, payouts] of Object.entries(byProcessor) as [string, any[]][]) {
-      const batchAmount = payouts.reduce((s: number, p: any) => s + (p.platformAmountKobo as number), 0);
+    for (const [processor, payouts] of Object.entries(byProcessor)) {
+      const batchAmount = payouts.reduce(
+        (s: number, p: any) => s + (p.platformAmountKobo as number),
+        0,
+      );
       const ids = payouts.map((p: any) => p.id as string);
 
       try {
         const ref = await this.initiateTransfer(processor, batchAmount, ids);
 
         // Mark all as PROCESSING with disbursement reference
-        await (this.prisma as any).platformPayout.updateMany({
+        await this.prisma.platformPayout.updateMany({
           where: { id: { in: ids } },
           data: {
             status: PayoutStatus.PROCESSING,
@@ -105,7 +117,9 @@ export class PlatformPayoutService {
 
         swept += payouts.length;
         totalKobo += batchAmount;
-        this.logger.log(`Sweep: initiated ₦${batchAmount / 100} transfer via ${processor} — ref: ${ref}`);
+        this.logger.log(
+          `Sweep: initiated ₦${batchAmount / 100} transfer via ${processor} — ref: ${ref}`,
+        );
       } catch (error) {
         this.logger.error(`Sweep failed for ${processor}: ${error.message}`);
         failed += payouts.length;
@@ -128,21 +142,27 @@ export class PlatformPayoutService {
 
     if (!disbursementRef || !status) return;
 
-    const payouts = await (this.prisma as any).platformPayout.findMany({
+    const payouts = await this.prisma.platformPayout.findMany({
       where: { disbursementReference: disbursementRef },
     });
 
     if (payouts.length === 0) {
-      this.logger.warn(`Transfer webhook: no payouts found for ref ${disbursementRef}`);
+      this.logger.warn(
+        `Transfer webhook: no payouts found for ref ${disbursementRef}`,
+      );
       return;
     }
 
-    await (this.prisma as any).platformPayout.updateMany({
+    await this.prisma.platformPayout.updateMany({
       where: { disbursementReference: disbursementRef },
       data: {
-        status: status === 'settled' ? PayoutStatus.SETTLED : PayoutStatus.FAILED,
+        status:
+          status === 'settled' ? PayoutStatus.SETTLED : PayoutStatus.FAILED,
         settledAt: status === 'settled' ? new Date() : null,
-        failureReason: status === 'failed' ? (body?.data?.complete_message ?? 'Transfer failed') : null,
+        failureReason:
+          status === 'failed'
+            ? (body?.data?.complete_message ?? 'Transfer failed')
+            : null,
       },
     });
 
@@ -167,7 +187,7 @@ export class PlatformPayoutService {
     if (schoolId) where.schoolId = schoolId;
 
     const [records, total] = await Promise.all([
-      (this.prisma as any).platformPayout.findMany({
+      this.prisma.platformPayout.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip,
@@ -177,10 +197,10 @@ export class PlatformPayoutService {
           school: { select: { name: true } },
         },
       }),
-      (this.prisma as any).platformPayout.count({ where }),
+      this.prisma.platformPayout.count({ where }),
     ]);
 
-    const summary = await (this.prisma as any).platformPayout.groupBy({
+    const summary = await this.prisma.platformPayout.groupBy({
       by: ['status'],
       where,
       _sum: { platformAmountKobo: true },
@@ -188,7 +208,7 @@ export class PlatformPayoutService {
     });
 
     return {
-      records: records.map(r => ({
+      records: records.map((r) => ({
         ...r,
         platformAmountNaira: r.platformAmountKobo / 100,
         transaction: {
@@ -196,7 +216,7 @@ export class PlatformPayoutService {
           amount: Number(r.transaction.amount),
         },
       })),
-      summary: summary.map(s => ({
+      summary: summary.map((s) => ({
         status: s.status,
         count: s._count,
         totalNaira: (s._sum.platformAmountKobo ?? 0) / 100,
@@ -207,15 +227,21 @@ export class PlatformPayoutService {
 
   // Retry a failed payout
   async retryPayout(id: string): Promise<void> {
-    const payout = await (this.prisma as any).platformPayout.findUnique({ where: { id } });
+    const payout = await this.prisma.platformPayout.findUnique({
+      where: { id },
+    });
     if (!payout) throw new NotFoundException('Payout record not found');
     if (payout.status !== PayoutStatus.FAILED) {
       throw new BadRequestException('Only FAILED payouts can be retried');
     }
 
-    await (this.prisma as any).platformPayout.update({
+    await this.prisma.platformPayout.update({
       where: { id },
-      data: { status: PayoutStatus.PENDING, failureReason: null, disbursementReference: null },
+      data: {
+        status: PayoutStatus.PENDING,
+        failureReason: null,
+        disbursementReference: null,
+      },
     });
 
     // Trigger sweep immediately for this single payout
@@ -242,14 +268,19 @@ export class PlatformPayoutService {
     throw new Error(`No manual transfer method for processor: ${processor}`);
   }
 
-  private async korapayTransfer(amountKobo: number, payoutIds: string[]): Promise<string> {
+  private async korapayTransfer(
+    amountKobo: number,
+    payoutIds: string[],
+  ): Promise<string> {
     const secretKey = this.config.get<string>('KORAPAY_SECRET_KEY');
-    const bankCode  = this.config.get<string>('PLATFORM_BANK_CODE');      // e.g. '058' for GTB
+    const bankCode = this.config.get<string>('PLATFORM_BANK_CODE'); // e.g. '058' for GTB
     const accountNo = this.config.get<string>('PLATFORM_ACCOUNT_NUMBER');
     const accountName = this.config.get<string>('PLATFORM_ACCOUNT_NAME');
 
     if (!bankCode || !accountNo) {
-      throw new Error('Platform bank details not configured in env (PLATFORM_BANK_CODE, PLATFORM_ACCOUNT_NUMBER)');
+      throw new Error(
+        'Platform bank details not configured in env (PLATFORM_BANK_CODE, PLATFORM_ACCOUNT_NUMBER)',
+      );
     }
 
     const reference = `PLT-${Date.now()}-${payoutIds.length}`;
@@ -266,7 +297,9 @@ export class PlatformPayoutService {
         },
         customer: {
           name: accountName ?? 'Platform Payout',
-          email: this.config.get<string>('PLATFORM_EMAIL') ?? 'finance@yourplatform.com',
+          email:
+            this.config.get<string>('PLATFORM_EMAIL') ??
+            'finance@yourplatform.com',
         },
       },
       description: `Platform charges for ${payoutIds.length} transaction(s)`,
@@ -290,4 +323,3 @@ export class PlatformPayoutService {
     return response.data.data.reference ?? reference;
   }
 }
-

@@ -1,4 +1,12 @@
-import { IsString, IsNumber, IsNotEmpty, IsObject, IsArray, ValidateNested, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsNotEmpty,
+  IsObject,
+  IsArray,
+  ValidateNested,
+  IsOptional,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -8,7 +16,9 @@ export class StudentScoreItemDto {
   @IsNotEmpty()
   studentId: string;
 
-  @ApiProperty({ description: 'Object containing scores for each assessment type' })
+  @ApiProperty({
+    description: 'Object containing scores for each assessment type',
+  })
   @IsObject()
   assessmentScores: Record<string, number>;
 

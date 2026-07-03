@@ -18,7 +18,10 @@ export class MailService {
 
     this.resend = new Resend(apiKey);
     this.fromAddress = this.configService.get<string>('EMAIL_FROM') ?? '';
-    this.schoolName = this.configService.get<string>('SCHOOL_NAME', 'School Management System');
+    this.schoolName = this.configService.get<string>(
+      'SCHOOL_NAME',
+      'School Management System',
+    );
 
     this.logger.log(`MailService initialised — from: ${this.fromAddress}`);
   }
@@ -32,11 +35,7 @@ export class MailService {
   ) {
     const finalSchoolName = schoolName ?? this.schoolName;
     const recipients = Array.isArray(to) ? to : [to];
-    const bccRecipients = bcc
-      ? Array.isArray(bcc)
-        ? bcc
-        : [bcc]
-      : undefined;
+    const bccRecipients = bcc ? (Array.isArray(bcc) ? bcc : [bcc]) : undefined;
 
     this.logger.log(
       `Attempting to send email to: ${recipients.join(', ')} | subject: ${subject}`,
@@ -73,9 +72,11 @@ export class MailService {
     tempPassword: string,
     schoolName?: string,
   ) {
-    const finalSchoolName = schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
+    const finalSchoolName =
+      schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
     const loginUrl =
-      this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000') + '/login';
+      this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000') +
+      '/login';
 
     const html = `
       <!DOCTYPE html>
@@ -143,9 +144,11 @@ export class MailService {
     tempPassword: string,
     schoolName?: string,
   ) {
-    const finalSchoolName = schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
+    const finalSchoolName =
+      schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
     const loginUrl =
-      this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000') + '/login';
+      this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000') +
+      '/login';
 
     const html = `
       <!DOCTYPE html>
@@ -213,7 +216,8 @@ export class MailService {
     newPassword: string,
     schoolName?: string,
   ) {
-    const finalSchoolName = schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
+    const finalSchoolName =
+      schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
 
     const html = `
       <!DOCTYPE html>
@@ -261,7 +265,12 @@ export class MailService {
       </html>
     `;
 
-    return this.sendMail(email, `Security Update - Password Changed`, html, finalSchoolName);
+    return this.sendMail(
+      email,
+      `Security Update - Password Changed`,
+      html,
+      finalSchoolName,
+    );
   }
 
   async sendAssignmentNotificationEmail(
@@ -308,7 +317,13 @@ export class MailService {
 
   async sendExamClassResultsToTeacher(data: {
     teacher: { fullName: string; email: string };
-    exam: { title: string; totalMarks: number; subject: any; class: any; term: string };
+    exam: {
+      title: string;
+      totalMarks: number;
+      subject: any;
+      class: any;
+      term: string;
+    };
     attempts: any[];
     school: { name: string; shortName: string | null };
   }) {

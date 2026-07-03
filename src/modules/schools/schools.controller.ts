@@ -1,15 +1,35 @@
-import { Controller, Post, Body, Get, Param, Query, Res, HttpStatus, NotFoundException, UseGuards, Patch, Req } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  Query,
+  Res,
+  HttpStatus,
+  NotFoundException,
+  UseGuards,
+  Patch,
+  Req,
+} from '@nestjs/common';
 import type { Response, Request } from 'express';
 import { SchoolsService } from './schools.service';
 import { CreateSchoolDto } from './dto/create-school.dto';
-import { 
-  UpdateCalendarDto, 
-  UpdateGradingDto, 
-  UpdateLocationDto, 
-  UpdatePreferencesDto, 
-  UpdateBrandingDto 
+import {
+  UpdateCalendarDto,
+  UpdateGradingDto,
+  UpdateLocationDto,
+  UpdatePreferencesDto,
+  UpdateBrandingDto,
 } from './dto/settings.dto';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiHeader, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiHeader,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -26,7 +46,10 @@ export class SchoolsController {
   constructor(private schoolsService: SchoolsService) {}
 
   @Post('register')
-  async register(@Body() createSchoolDto: CreateSchoolDto, @Res() res: Response) {
+  async register(
+    @Body() createSchoolDto: CreateSchoolDto,
+    @Res() res: Response,
+  ) {
     const result = await this.schoolsService.registerSchool(createSchoolDto);
     return res.status(HttpStatus.CREATED).json({
       statusCode: HttpStatus.CREATED,
@@ -64,8 +87,15 @@ export class SchoolsController {
 
   // Onboarding progress endpoints
   @Post('onboarding/progress')
-  async saveProgress(@Body() body: { email: string; step: number; data: any }, @Res() res: Response) {
-    const progress = await this.schoolsService.saveOnboardingProgress(body.email, body.step, body.data);
+  async saveProgress(
+    @Body() body: { email: string; step: number; data: any },
+    @Res() res: Response,
+  ) {
+    const progress = await this.schoolsService.saveOnboardingProgress(
+      body.email,
+      body.step,
+      body.data,
+    );
     return res.status(HttpStatus.OK).json({
       statusCode: HttpStatus.OK,
       message: 'Onboarding progress saved successfully',
@@ -88,7 +118,11 @@ export class SchoolsController {
   @Get('settings')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(SchoolAdminRole.SCHOOL_OWNER, SchoolAdminRole.DIRECTOR, SchoolAdminRole.ICT_ADMIN)
+  @Roles(
+    SchoolAdminRole.SCHOOL_OWNER,
+    SchoolAdminRole.DIRECTOR,
+    SchoolAdminRole.ICT_ADMIN,
+  )
   async getSettings(@Req() req: any, @Res() res: Response) {
     const schoolId = req.user.schoolId;
     const settings = await this.schoolsService.getSettings(schoolId);
@@ -103,7 +137,11 @@ export class SchoolsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(SchoolAdminRole.SCHOOL_OWNER, SchoolAdminRole.DIRECTOR)
-  async updateCalendar(@Req() req: any, @Body() dto: UpdateCalendarDto, @Res() res: Response) {
+  async updateCalendar(
+    @Req() req: any,
+    @Body() dto: UpdateCalendarDto,
+    @Res() res: Response,
+  ) {
     const schoolId = req.user.schoolId;
     const result = await this.schoolsService.updateCalendar(schoolId, dto);
     return res.status(HttpStatus.OK).json({
@@ -116,7 +154,11 @@ export class SchoolsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(SchoolAdminRole.SCHOOL_OWNER, SchoolAdminRole.DIRECTOR)
-  async updateGrading(@Req() req: any, @Body() dto: UpdateGradingDto, @Res() res: Response) {
+  async updateGrading(
+    @Req() req: any,
+    @Body() dto: UpdateGradingDto,
+    @Res() res: Response,
+  ) {
     const schoolId = req.user.schoolId;
     const result = await this.schoolsService.updateGrading(schoolId, dto);
     return res.status(HttpStatus.OK).json({
@@ -130,7 +172,11 @@ export class SchoolsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(SchoolAdminRole.SCHOOL_OWNER, SchoolAdminRole.DIRECTOR)
-  async updateLocation(@Req() req: any, @Body() dto: UpdateLocationDto, @Res() res: Response) {
+  async updateLocation(
+    @Req() req: any,
+    @Body() dto: UpdateLocationDto,
+    @Res() res: Response,
+  ) {
     const schoolId = req.user.schoolId;
     const result = await this.schoolsService.updateLocation(schoolId, dto);
     return res.status(HttpStatus.OK).json({
@@ -144,7 +190,11 @@ export class SchoolsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(SchoolAdminRole.SCHOOL_OWNER, SchoolAdminRole.DIRECTOR)
-  async updatePreferences(@Req() req: any, @Body() dto: UpdatePreferencesDto, @Res() res: Response) {
+  async updatePreferences(
+    @Req() req: any,
+    @Body() dto: UpdatePreferencesDto,
+    @Res() res: Response,
+  ) {
     const schoolId = req.user.schoolId;
     const result = await this.schoolsService.updatePreferences(schoolId, dto);
     return res.status(HttpStatus.OK).json({
@@ -158,7 +208,11 @@ export class SchoolsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(SchoolAdminRole.SCHOOL_OWNER, SchoolAdminRole.DIRECTOR)
-  async updateBranding(@Req() req: any, @Body() dto: UpdateBrandingDto, @Res() res: Response) {
+  async updateBranding(
+    @Req() req: any,
+    @Body() dto: UpdateBrandingDto,
+    @Res() res: Response,
+  ) {
     const schoolId = req.user.schoolId;
     const result = await this.schoolsService.updateBranding(schoolId, dto);
     return res.status(HttpStatus.OK).json({

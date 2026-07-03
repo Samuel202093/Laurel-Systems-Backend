@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateGradingSystemDto } from './dto/grading-system.dto';
 
@@ -6,7 +10,11 @@ import { CreateGradingSystemDto } from './dto/grading-system.dto';
 export class GradingService {
   constructor(private prisma: PrismaService) {}
 
-  private async getOrCreateSession(schoolId: string, sessionName: string, tx: any) {
+  private async getOrCreateSession(
+    schoolId: string,
+    sessionName: string,
+    tx: any,
+  ) {
     let session = await tx.academicSession.findUnique({
       where: {
         schoolId_name: {
@@ -35,7 +43,12 @@ export class GradingService {
     return session;
   }
 
-  private async getOrCreateTerm(sessionId: string, termName: string, session: any, tx: any) {
+  private async getOrCreateTerm(
+    sessionId: string,
+    termName: string,
+    session: any,
+    tx: any,
+  ) {
     if (!termName || termName.toLowerCase() === 'session-wide') {
       return null;
     }
@@ -130,10 +143,19 @@ export class GradingService {
       return await this.prisma.$transaction(
         async (tx) => {
           // 1. Resolve or Create Academic Session
-          const session = await this.getOrCreateSession(schoolId, sessionName, tx);
+          const session = await this.getOrCreateSession(
+            schoolId,
+            sessionName,
+            tx,
+          );
 
           // 2. Resolve or Create Academic Term
-          const term = await this.getOrCreateTerm(session.id, termName || '', session, tx);
+          const term = await this.getOrCreateTerm(
+            session.id,
+            termName || '',
+            session,
+            tx,
+          );
           const termIdValue = term?.id || null;
 
           // 3. Map grades to handle "grade" property from frontend

@@ -1,9 +1,17 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
-import { PromoteStudentDto, PromoteMultipleStudentsDto } from './dto/promote-student.dto';
+import {
+  PromoteStudentDto,
+  PromoteMultipleStudentsDto,
+} from './dto/promote-student.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -15,10 +23,14 @@ export class StudentsService {
 
   async create(schoolId: string, dto: CreateStudentDto) {
     const { email, registrationNumber, ...rest } = dto;
-    
+
     // 1. Clean classId and classArmId
-    const classId = dto.classId && dto.classId.trim() !== '' ? dto.classId : undefined;
-    const classArmId = dto.classArmId && dto.classArmId.trim() !== '' ? dto.classArmId : undefined;
+    const classId =
+      dto.classId && dto.classId.trim() !== '' ? dto.classId : undefined;
+    const classArmId =
+      dto.classArmId && dto.classArmId.trim() !== ''
+        ? dto.classArmId
+        : undefined;
 
     // 2. Map fields and clean extra fields that shouldn't go to Prisma data
     const studentData: any = {
@@ -53,7 +65,9 @@ export class StudentsService {
       where: { registrationNumber },
     });
     if (existingStudentByReg) {
-      throw new ConflictException(`A student with registration number ${registrationNumber} already exists`);
+      throw new ConflictException(
+        `A student with registration number ${registrationNumber} already exists`,
+      );
     }
 
     // 5. Verify class and arm if provided
@@ -61,7 +75,10 @@ export class StudentsService {
       const cls = await (this.prisma as any).class.findUnique({
         where: { id: classId, schoolId },
       });
-      if (!cls) throw new NotFoundException(`Class with ID ${classId} not found in this school`);
+      if (!cls)
+        throw new NotFoundException(
+          `Class with ID ${classId} not found in this school`,
+        );
     }
     if (classArmId) {
       const arm = await (this.prisma as any).classArm.findUnique({
@@ -69,7 +86,9 @@ export class StudentsService {
         include: { class: true },
       });
       if (!arm || arm.class.schoolId !== schoolId) {
-        throw new NotFoundException(`Class Arm with ID ${classArmId} not found in this school`);
+        throw new NotFoundException(
+          `Class Arm with ID ${classArmId} not found in this school`,
+        );
       }
     }
 
@@ -104,7 +123,10 @@ export class StudentsService {
           school.name,
         );
       } catch (error) {
-        console.error(`Failed to send welcome email to student ${student.email}:`, error);
+        console.error(
+          `Failed to send welcome email to student ${student.email}:`,
+          error,
+        );
       }
     }
 
@@ -112,7 +134,16 @@ export class StudentsService {
     return result;
   }
 
-  async findAll(schoolId: string, query: { page?: number; limit?: number; search?: string; classId?: string; classArmId?: string }) {
+  async findAll(
+    schoolId: string,
+    query: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      classId?: string;
+      classArmId?: string;
+    },
+  ) {
     const { page = 1, limit = 10, search, classId, classArmId } = query;
     const skip = (page - 1) * limit;
 
@@ -171,7 +202,9 @@ export class StudentsService {
     });
 
     if (!student) {
-      throw new NotFoundException(`Student with ID ${id} not found in this school`);
+      throw new NotFoundException(
+        `Student with ID ${id} not found in this school`,
+      );
     }
 
     const { password, ...result } = student;
@@ -184,15 +217,22 @@ export class StudentsService {
     });
 
     if (!student) {
-      throw new NotFoundException(`Student with ID ${id} not found in this school`);
+      throw new NotFoundException(
+        `Student with ID ${id} not found in this school`,
+      );
     }
 
-    if (dto.registrationNumber && dto.registrationNumber !== student.registrationNumber) {
+    if (
+      dto.registrationNumber &&
+      dto.registrationNumber !== student.registrationNumber
+    ) {
       const existing = await (this.prisma as any).student.findUnique({
         where: { registrationNumber: dto.registrationNumber },
       });
       if (existing) {
-        throw new ConflictException(`A student with registration number ${dto.registrationNumber} already exists`);
+        throw new ConflictException(
+          `A student with registration number ${dto.registrationNumber} already exists`,
+        );
       }
     }
 
@@ -213,8 +253,12 @@ export class StudentsService {
       lgaOfOrigin: dto.lgaOfOrigin,
       country: dto.country,
       state: dto.state,
-      classId: dto.classId && dto.classId.trim() !== '' ? dto.classId : undefined,
-      classArmId: dto.classArmId && dto.classArmId.trim() !== '' ? dto.classArmId : undefined,
+      classId:
+        dto.classId && dto.classId.trim() !== '' ? dto.classId : undefined,
+      classArmId:
+        dto.classArmId && dto.classArmId.trim() !== ''
+          ? dto.classArmId
+          : undefined,
     };
 
     if (dto.dateOfBirth) {
@@ -222,7 +266,9 @@ export class StudentsService {
     }
 
     // Remove undefined fields to prevent Prisma from trying to update them to undefined
-    Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+    Object.keys(updateData).forEach(
+      (key) => updateData[key] === undefined && delete updateData[key],
+    );
 
     const updated = await (this.prisma as any).student.update({
       where: { id, schoolId },
@@ -243,7 +289,9 @@ export class StudentsService {
     });
 
     if (!student) {
-      throw new NotFoundException(`Student with ID ${id} not found in this school`);
+      throw new NotFoundException(
+        `Student with ID ${id} not found in this school`,
+      );
     }
 
     return (this.prisma as any).student.delete({
@@ -257,21 +305,30 @@ export class StudentsService {
     const student = await (this.prisma as any).student.findUnique({
       where: { id: studentId, schoolId },
     });
-    if (!student) throw new NotFoundException(`Student with ID ${studentId} not found in this school`);
+    if (!student)
+      throw new NotFoundException(
+        `Student with ID ${studentId} not found in this school`,
+      );
 
     // Verify target class and arm belong to this school
     const [targetClass, targetArm] = await Promise.all([
-      (this.prisma as any).class.findUnique({ where: { id: targetClassId, schoolId } }),
+      (this.prisma as any).class.findUnique({
+        where: { id: targetClassId, schoolId },
+      }),
       (this.prisma as any).classArm.findUnique({
         where: { id: targetClassArmId },
         include: { class: true },
       }),
     ]);
 
-    if (!targetClass) throw new NotFoundException(`Target class not found in this school`);
-    if (!targetArm || targetArm.class.schoolId !== schoolId) throw new NotFoundException(`Target class arm not found in this school`);
+    if (!targetClass)
+      throw new NotFoundException(`Target class not found in this school`);
+    if (!targetArm || targetArm.class.schoolId !== schoolId)
+      throw new NotFoundException(`Target class arm not found in this school`);
     if (targetArm.classId !== targetClassId) {
-      throw new BadRequestException(`Class arm does not belong to the target class`);
+      throw new BadRequestException(
+        `Class arm does not belong to the target class`,
+      );
     }
 
     const updated = await (this.prisma as any).student.update({
@@ -295,17 +352,23 @@ export class StudentsService {
 
     // Verify target class and arm belong to this school
     const [targetClass, targetArm] = await Promise.all([
-      (this.prisma as any).class.findUnique({ where: { id: targetClassId, schoolId } }),
+      (this.prisma as any).class.findUnique({
+        where: { id: targetClassId, schoolId },
+      }),
       (this.prisma as any).classArm.findUnique({
         where: { id: targetClassArmId },
         include: { class: true },
       }),
     ]);
 
-    if (!targetClass) throw new NotFoundException(`Target class not found in this school`);
-    if (!targetArm || targetArm.class.schoolId !== schoolId) throw new NotFoundException(`Target class arm not found in this school`);
+    if (!targetClass)
+      throw new NotFoundException(`Target class not found in this school`);
+    if (!targetArm || targetArm.class.schoolId !== schoolId)
+      throw new NotFoundException(`Target class arm not found in this school`);
     if (targetArm.classId !== targetClassId) {
-      throw new BadRequestException(`Class arm does not belong to the target class`);
+      throw new BadRequestException(
+        `Class arm does not belong to the target class`,
+      );
     }
 
     // Update only students belonging to this school

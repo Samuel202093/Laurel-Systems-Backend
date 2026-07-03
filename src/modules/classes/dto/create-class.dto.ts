@@ -7,12 +7,19 @@ export class CreateClassDto {
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ example: 'uuid-of-school', description: 'The unique ID of the school' })
+  @ApiProperty({
+    example: 'uuid-of-school',
+    description: 'The unique ID of the school',
+  })
   @IsString()
   @IsNotEmpty()
   schoolId: string;
 
-  @ApiProperty({ example: ['A', 'B', 'Gold'], description: 'Initial arms for the class', required: false })
+  @ApiProperty({
+    example: ['A', 'B', 'Gold'],
+    description: 'Initial arms for the class',
+    required: false,
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()

@@ -6,13 +6,9 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-
   // Enable CORS
   app.enableCors({
-    origin: [
-      'https://laurel-school.netlify.app',
-      'http://localhost:3000',
-    ],
+    origin: ['https://laurevo.cloud', 'http://localhost:3000'],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
   });
@@ -42,7 +38,9 @@ async function bootstrap() {
   const port = process.env.PORT || 3005;
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}/api/v1`);
-  console.log(`Swagger documentation available at: http://localhost:${port}/api/v1/docs`);
+  console.log(
+    `Swagger documentation available at: http://localhost:${port}/api/v1/docs`,
+  );
 }
 // bootstrap();
 bootstrap().catch((err) => {

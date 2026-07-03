@@ -87,7 +87,9 @@ export class CommunicationService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /** Resolve and validate that a school exists; return its public profile. */
-  private async resolveSchool(schoolId: string): Promise<SchoolInfo & { id: string }> {
+  private async resolveSchool(
+    schoolId: string,
+  ): Promise<SchoolInfo & { id: string }> {
     const school = await this.prisma.school.findUnique({
       where: { id: schoolId },
       select: {
@@ -212,8 +214,12 @@ export class CommunicationService {
       this.logger.log(`Attachment uploaded: ${result.secure_url}`);
       return { fileUrl: result.secure_url, filePublicId: result.public_id };
     } catch (error) {
-      this.logger.error(`Cloudinary upload failed: ${(error as Error).message}`);
-      throw new InternalServerErrorException('Failed to upload the email attachment.');
+      this.logger.error(
+        `Cloudinary upload failed: ${(error as Error).message}`,
+      );
+      throw new InternalServerErrorException(
+        'Failed to upload the email attachment.',
+      );
     }
   }
 
@@ -239,10 +245,11 @@ export class CommunicationService {
     file?: Express.Multer.File,
   ) {
     // Resolve school identity & upload attachment in parallel (independent ops)
-    const [school, { fileUrl: uploadedUrl, filePublicId: uploadedId }] = await Promise.all([
-      this.resolveSchool(schoolId),
-      this.uploadAttachment(schoolId, file),
-    ]);
+    const [school, { fileUrl: uploadedUrl, filePublicId: uploadedId }] =
+      await Promise.all([
+        this.resolveSchool(schoolId),
+        this.uploadAttachment(schoolId, file),
+      ]);
 
     const fileUrl = payload.fileUrl ?? uploadedUrl;
     const filePublicId = payload.filePublicId ?? uploadedId;
@@ -250,7 +257,13 @@ export class CommunicationService {
     // Recipients already normalised by the controller
     const uniqueRecipients = [...new Set<string>(payload.recipients)];
 
-    const finalHtml = this.buildEmailHtml(school, payload.subject, payload.message, undefined, fileUrl);
+    const finalHtml = this.buildEmailHtml(
+      school,
+      payload.subject,
+      payload.message,
+      undefined,
+      fileUrl,
+    );
 
     // Split into BCC batches
     const batches: string[][] = [];
@@ -260,7 +273,7 @@ export class CommunicationService {
 
     this.logger.log(
       `Bulk email: ${uniqueRecipients.length} recipients → ${batches.length} batch(es) ` +
-      `(BATCH_SIZE=${this.BATCH_SIZE}, CONCURRENCY=${this.CONCURRENCY}) for school "${school.name}"`,
+        `(BATCH_SIZE=${this.BATCH_SIZE}, CONCURRENCY=${this.CONCURRENCY}) for school "${school.name}"`,
     );
 
     // The real sender address acts as the "To" address for BCC privacy
@@ -277,11 +290,11 @@ export class CommunicationService {
         window.map((batch) =>
           this.retryWithBackoff(() =>
             this.mailService.sendMail(
-              senderAddress!,   // to: own inbox (BCC privacy pattern)
+              senderAddress!, // to: own inbox (BCC privacy pattern)
               payload.subject,
               finalHtml,
               school.name,
-              batch,            // bcc: actual recipients
+              batch, // bcc: actual recipients
             ),
           ),
         ),
@@ -295,7 +308,9 @@ export class CommunicationService {
           failedCount += batch.length;
           const reason = (result.reason as Error)?.message ?? 'Unknown error';
           errors.push(`Batch [${batch[0]}…] failed after retries: ${reason}`);
-          this.logger.error(`Batch permanently failed (${batch[0]}…): ${reason}`);
+          this.logger.error(
+            `Batch permanently failed (${batch[0]}…): ${reason}`,
+          );
         }
       });
 
@@ -352,10 +367,11 @@ export class CommunicationService {
     file?: Express.Multer.File,
   ) {
     // Resolve school identity and upload attachment concurrently (independent ops)
-    const [school, { fileUrl: uploadedUrl, filePublicId: uploadedId }] = await Promise.all([
-      this.resolveSchool(schoolId),
-      this.uploadAttachment(schoolId, file),
-    ]);
+    const [school, { fileUrl: uploadedUrl, filePublicId: uploadedId }] =
+      await Promise.all([
+        this.resolveSchool(schoolId),
+        this.uploadAttachment(schoolId, file),
+      ]);
 
     const fileUrl = payload.fileUrl ?? uploadedUrl;
     const filePublicId = payload.filePublicId ?? uploadedId;
@@ -385,11 +401,15 @@ export class CommunicationService {
           school.name,
         ),
       );
-      this.logger.log(`Single email sent to ${payload.recipient} for school "${school.name}"`);
+      this.logger.log(
+        `Single email sent to ${payload.recipient} for school "${school.name}"`,
+      );
     } catch (error) {
       status = CommunicationStatus.FAILED;
       errorMsg = (error as Error).message;
-      this.logger.error(`Failed to send single email to ${payload.recipient}: ${errorMsg}`);
+      this.logger.error(
+        `Failed to send single email to ${payload.recipient}: ${errorMsg}`,
+      );
     }
 
     // Always record history — even on failure

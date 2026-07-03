@@ -1,4 +1,10 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
@@ -36,7 +42,9 @@ export class TeachersService {
       where: { staffId: dto.staffId },
     });
     if (existingStaffId) {
-      throw new ConflictException('A teacher with this Staff ID already exists');
+      throw new ConflictException(
+        'A teacher with this Staff ID already exists',
+      );
     }
 
     // Generate a secure temporary password
@@ -45,7 +53,7 @@ export class TeachersService {
 
     // Map subject (string) and subjects (array) for compatibility
     const subjectsSet = new Set<string>();
-    if (dto.subjects) dto.subjects.forEach(s => subjectsSet.add(s));
+    if (dto.subjects) dto.subjects.forEach((s) => subjectsSet.add(s));
     if (dto.subject) subjectsSet.add(dto.subject);
     const teacherSubjects = Array.from(subjectsSet);
 
@@ -105,7 +113,9 @@ export class TeachersService {
     }
 
     // Filter out duplicates and empty roles
-    const uniqueRoles = Array.from(new Set(roles.filter(r => r.trim() !== '')));
+    const uniqueRoles = Array.from(
+      new Set(roles.filter((r) => r.trim() !== '')),
+    );
 
     const updatedTeacher = await (this.prisma as any).teacher.update({
       where: { id },
@@ -146,7 +156,9 @@ export class TeachersService {
         where: { staffId: dto.staffId },
       });
       if (existingStaffId) {
-        throw new ConflictException('A teacher with this Staff ID already exists');
+        throw new ConflictException(
+          'A teacher with this Staff ID already exists',
+        );
       }
     }
 
@@ -283,10 +295,10 @@ export class TeachersService {
 
       // Upload new image
       const result = await this.cloudinary.uploadFile(file);
-      
+
       const updatedTeacher = await (this.prisma as any).teacher.update({
         where: { id },
-        data: { 
+        data: {
           avatar: result.secure_url,
           avatarPublicId: result.public_id,
         },
@@ -368,7 +380,7 @@ export class TeachersService {
    * Fetch classes and arms assigned to a specific teacher.
    */
   async getAssignedClasses(id: string, schoolId: string) {
-    const teacher = (await this.findOne(id)) as any;
+    const teacher = await this.findOne(id);
 
     if (teacher.schoolId !== schoolId) {
       throw new BadRequestException('Teacher does not belong to this school');
@@ -403,7 +415,7 @@ export class TeachersService {
    * Fetch students belonging to classes/arms assigned to a teacher.
    */
   async getAssignedStudents(id: string, schoolId: string) {
-    const teacher = (await this.findOne(id)) as any;
+    const teacher = await this.findOne(id);
 
     if (teacher.schoolId !== schoolId) {
       throw new BadRequestException('Teacher does not belong to this school');
@@ -425,10 +437,7 @@ export class TeachersService {
         class: true,
         classArm: true,
       },
-      orderBy: [
-        { class: { name: 'asc' } },
-        { lastName: 'asc' },
-      ],
+      orderBy: [{ class: { name: 'asc' } }, { lastName: 'asc' }],
     });
 
     return students.map(({ password, ...s }: any) => s);

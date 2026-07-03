@@ -60,6 +60,12 @@ A robust and scalable backend system for school management, built with **NestJS*
    EMAIL_HOST="smtp.gmail.com"
    EMAIL_USER="your-email@gmail.com"
    MAILER_PASSWORD="your-app-password"
+   
+   # Default Super Admin Credentials (optional)
+   DEFAULT_SUPER_ADMIN_EMAIL="superadmin@example.com"
+   DEFAULT_SUPER_ADMIN_PASSWORD="changeme123"
+   DEFAULT_SUPER_ADMIN_FIRST_NAME="Super"
+   DEFAULT_SUPER_ADMIN_LAST_NAME="Admin"
    ```
 
 4. Synchronize the database:
@@ -68,7 +74,12 @@ A robust and scalable backend system for school management, built with **NestJS*
    npx prisma generate
    ```
 
-5. Start the application:
+5. Seed the default super admin:
+   ```bash
+   npx prisma db seed
+   ```
+
+6. Start the application:
    ```bash
    # Development mode
    npm run start:dev

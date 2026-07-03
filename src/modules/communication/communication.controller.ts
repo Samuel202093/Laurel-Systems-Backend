@@ -81,7 +81,10 @@ export class CommunicationController {
           example: ['staff1@school.com', 'parent1@school.com'],
         },
         subject: { type: 'string', example: 'Sports Day Announcement' },
-        message: { type: 'string', example: 'Dear all, please note that Sports Day...' },
+        message: {
+          type: 'string',
+          example: 'Dear all, please note that Sports Day...',
+        },
         recipientType: {
           type: 'string',
           enum: Object.values(RecipientType),
@@ -97,7 +100,8 @@ export class CommunicationController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Bulk email dispatch completed (check status field for partial failures)',
+    description:
+      'Bulk email dispatch completed (check status field for partial failures)',
     schema: {
       example: {
         success: true,
@@ -113,7 +117,10 @@ export class CommunicationController {
       },
     },
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized — JWT token missing or invalid' })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized — JWT token missing or invalid',
+  })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient role' })
   @ApiResponse({ status: 404, description: 'School not found' })
   async sendBulkEmail(
@@ -124,8 +131,13 @@ export class CommunicationController {
     // Multipart form-data can send arrays as a single comma-joined string or JSON — normalise here
     let recipientsRaw: any = payload.recipients;
     if (typeof recipientsRaw === 'string') {
-      try { recipientsRaw = JSON.parse(recipientsRaw); }
-      catch { recipientsRaw = (recipientsRaw as string).split(',').map((r: string) => r.trim()); }
+      try {
+        recipientsRaw = JSON.parse(recipientsRaw);
+      } catch {
+        recipientsRaw = (recipientsRaw as string)
+          .split(',')
+          .map((r: string) => r.trim());
+      }
     }
     payload.recipients = Array.isArray(recipientsRaw)
       ? recipientsRaw.map((r: string) => r.trim()).filter(Boolean)
@@ -166,7 +178,10 @@ export class CommunicationController {
           example: 'John Doe',
         },
         subject: { type: 'string', example: 'Important Notice' },
-        message: { type: 'string', example: 'We would like to inform you that...' },
+        message: {
+          type: 'string',
+          example: 'We would like to inform you that...',
+        },
         recipientType: {
           type: 'string',
           enum: Object.values(RecipientType),
@@ -183,7 +198,8 @@ export class CommunicationController {
       example: {
         success: true,
         schoolName: 'Laurel Academy',
-        message: 'Laurel Academy — Email sent successfully to john.doe@school.com.',
+        message:
+          'Laurel Academy — Email sent successfully to john.doe@school.com.',
         data: {
           status: 'sent',
           history: { id: 'uuid', timestamp: '2025-01-01T00:00:00.000Z' },
@@ -191,7 +207,10 @@ export class CommunicationController {
       },
     },
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized — JWT token missing or invalid' })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized — JWT token missing or invalid',
+  })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient role' })
   @ApiResponse({ status: 404, description: 'School not found' })
   async sendSingleEmail(
@@ -206,18 +225,36 @@ export class CommunicationController {
   @Get('history/:schoolId')
   @Roles(...COMMUNICATION_ROLES)
   @ApiParam({ name: 'schoolId', description: 'Unique ID of the school' })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Records per page (default: 20, max: 100)' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Records per page (default: 20, max: 100)',
+  })
   @ApiOperation({
     summary: 'Get paginated communication history for a school',
-    description: 'Returns sent email records ordered by most recent first, with pagination metadata.',
+    description:
+      'Returns sent email records ordered by most recent first, with pagination metadata.',
   })
   @ApiResponse({
     status: 200,
     description: 'Paginated communication history',
     schema: {
       example: {
-        data: [{ id: 'uuid', subject: 'Sports Day', status: 'sent', timestamp: '2025-01-01T00:00:00.000Z' }],
+        data: [
+          {
+            id: 'uuid',
+            subject: 'Sports Day',
+            status: 'sent',
+            timestamp: '2025-01-01T00:00:00.000Z',
+          },
+        ],
         meta: { total: 45, page: 1, limit: 20, totalPages: 3 },
       },
     },
@@ -241,7 +278,10 @@ export class CommunicationController {
     @Param('schoolId') schoolId: string,
     @Body() payload: SaveHistoryDto,
   ) {
-    const record = await this.communicationService.saveHistory(schoolId, payload);
+    const record = await this.communicationService.saveHistory(
+      schoolId,
+      payload,
+    );
     return {
       success: true,
       message: 'Communication history record saved.',
@@ -253,14 +293,21 @@ export class CommunicationController {
   @Delete(':id/:schoolId')
   @Roles(...COMMUNICATION_ROLES)
   @ApiParam({ name: 'id', description: 'Communication record ID to delete' })
-  @ApiParam({ name: 'schoolId', description: 'Unique ID of the school (ownership check)' })
+  @ApiParam({
+    name: 'schoolId',
+    description: 'Unique ID of the school (ownership check)',
+  })
   @ApiOperation({
     summary: 'Delete a communication record and its Cloudinary attachment',
-    description: 'Removes the DB record and attempts to delete any associated Cloudinary file. ' +
+    description:
+      'Removes the DB record and attempts to delete any associated Cloudinary file. ' +
       'Cloudinary deletion failures are non-fatal — the DB record is always removed.',
   })
   @ApiResponse({ status: 200, description: 'Record deleted' })
-  @ApiResponse({ status: 404, description: 'Record not found or does not belong to this school' })
+  @ApiResponse({
+    status: 404,
+    description: 'Record not found or does not belong to this school',
+  })
   async deleteMail(
     @Param('id') id: string,
     @Param('schoolId') schoolId: string,

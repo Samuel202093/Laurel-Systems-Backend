@@ -13,7 +13,13 @@ import type { Response } from 'express';
 import { BankAccountsService } from './bank-accounts.service';
 import { CreateBankAccountDto } from './dto/create-bank-account.dto';
 import { UpdateBankAccountDto } from './dto/update-bank-account.dto';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiHeader } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiHeader,
+} from '@nestjs/swagger';
 
 @ApiTags('Bank Accounts')
 @Controller('bank-accounts')
@@ -54,8 +60,14 @@ export class BankAccountsController {
   @Get('school/:schoolId')
   @ApiOperation({ summary: 'Get all bank accounts for a school' })
   @ApiParam({ name: 'schoolId', description: 'The unique ID of the school' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Bank accounts retrieved.' })
-  async findAllBySchoolId(@Param('schoolId') schoolId: string, @Res() res: Response) {
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Bank accounts retrieved.',
+  })
+  async findAllBySchoolId(
+    @Param('schoolId') schoolId: string,
+    @Res() res: Response,
+  ) {
     const data = await this.bankAccountsService.findAllBySchoolId(schoolId);
     return res.status(HttpStatus.OK).json({
       statusCode: HttpStatus.OK,
@@ -67,8 +79,14 @@ export class BankAccountsController {
   @Get(':id')
   @ApiOperation({ summary: 'Get a specific bank account by ID' })
   @ApiParam({ name: 'id', description: 'The unique ID of the bank account' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Bank account retrieved.' })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Bank account not found.' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Bank account retrieved.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Bank account not found.',
+  })
   async findOne(@Param('id') id: string, @Res() res: Response) {
     const data = await this.bankAccountsService.findOne(id);
     return res.status(HttpStatus.OK).json({
@@ -81,14 +99,23 @@ export class BankAccountsController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update a specific bank account' })
   @ApiParam({ name: 'id', description: 'The unique ID of the bank account' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Bank account updated successfully.' })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Bank account not found.' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Bank account updated successfully.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Bank account not found.',
+  })
   async update(
     @Param('id') id: string,
     @Body() updateBankAccountDto: UpdateBankAccountDto,
     @Res() res: Response,
   ) {
-    const data = await this.bankAccountsService.update(id, updateBankAccountDto);
+    const data = await this.bankAccountsService.update(
+      id,
+      updateBankAccountDto,
+    );
     return res.status(HttpStatus.OK).json({
       statusCode: HttpStatus.OK,
       message: 'Bank account updated successfully',
@@ -99,8 +126,14 @@ export class BankAccountsController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a specific bank account' })
   @ApiParam({ name: 'id', description: 'The unique ID of the bank account' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Bank account removed successfully.' })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Bank account not found.' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Bank account removed successfully.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Bank account not found.',
+  })
   async remove(@Param('id') id: string, @Res() res: Response) {
     await this.bankAccountsService.remove(id);
     return res.status(HttpStatus.OK).json({

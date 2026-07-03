@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateBankAccountDto } from './dto/create-bank-account.dto';
 import { UpdateBankAccountDto } from './dto/update-bank-account.dto';
@@ -27,7 +31,9 @@ export class BankAccountsService {
     });
 
     if (existing) {
-      throw new ConflictException(`Bank account with this number already exists for this school`);
+      throw new ConflictException(
+        `Bank account with this number already exists for this school`,
+      );
     }
 
     // If this is set as primary, unset other primary accounts for this school

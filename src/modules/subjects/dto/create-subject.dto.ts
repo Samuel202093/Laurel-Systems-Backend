@@ -12,16 +12,33 @@ export class CreateSubjectDto {
   @IsOptional()
   code?: string;
 
-  @ApiProperty({ example: 'Fundamental mathematics principles', required: false })
+  @ApiProperty({
+    example: 'Fundamental mathematics principles',
+    required: false,
+  })
   @IsString()
   @IsOptional()
   description?: string;
 
   @ApiProperty({
-    enum: ['General', 'Science', 'Arts', 'Commercial', 'Vocational', 'Languages'],
+    enum: [
+      'General',
+      'Science',
+      'Arts',
+      'Commercial',
+      'Vocational',
+      'Languages',
+    ],
     default: 'General',
   })
-  @IsEnum(['General', 'Science', 'Arts', 'Commercial', 'Vocational', 'Languages'])
+  @IsEnum([
+    'General',
+    'Science',
+    'Arts',
+    'Commercial',
+    'Vocational',
+    'Languages',
+  ])
   @IsOptional()
   category?: string;
 }

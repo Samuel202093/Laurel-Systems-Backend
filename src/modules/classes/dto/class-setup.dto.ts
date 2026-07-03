@@ -1,4 +1,12 @@
-import { IsBoolean, IsArray, IsString, IsOptional, ValidateNested, IsNotEmpty, IsNumber } from 'class-validator';
+import {
+  IsBoolean,
+  IsArray,
+  IsString,
+  IsOptional,
+  ValidateNested,
+  IsNotEmpty,
+  IsNumber,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 class ClassLevelSelectionDto {

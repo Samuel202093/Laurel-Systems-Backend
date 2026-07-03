@@ -15,7 +15,14 @@ import { ClassesService } from './classes.service';
 import { ClassSetupDto } from './dto/class-setup.dto';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiHeader, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiHeader,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -42,10 +49,7 @@ export class ClassesController {
     'SUB_ADMIN',
   )
   @ApiOperation({ summary: 'Create a new class' })
-  async create(
-    @Body() dto: CreateClassDto,
-    @Res() res: Response
-  ) {
+  async create(@Body() dto: CreateClassDto, @Res() res: Response) {
     const data = await this.classesService.create(dto);
     return res.status(HttpStatus.CREATED).json({
       statusCode: HttpStatus.CREATED,
@@ -56,10 +60,7 @@ export class ClassesController {
 
   @Get('school/:schoolId')
   @ApiOperation({ summary: 'Get all classes for a school' })
-  async findAll(
-    @Param('schoolId') schoolId: string,
-    @Res() res: Response
-  ) {
+  async findAll(@Param('schoolId') schoolId: string, @Res() res: Response) {
     const data = await this.classesService.findAll(schoolId);
     return res.status(HttpStatus.OK).json({
       statusCode: HttpStatus.OK,
@@ -70,10 +71,7 @@ export class ClassesController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a single class by ID' })
-  async findOne(
-    @Param('id') id: string,
-    @Res() res: Response
-  ) {
+  async findOne(@Param('id') id: string, @Res() res: Response) {
     const data = await this.classesService.findOne(id);
     return res.status(HttpStatus.OK).json({
       statusCode: HttpStatus.OK,
@@ -96,7 +94,7 @@ export class ClassesController {
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateClassDto,
-    @Res() res: Response
+    @Res() res: Response,
   ) {
     const data = await this.classesService.update(id, dto);
     return res.status(HttpStatus.OK).json({
@@ -117,10 +115,7 @@ export class ClassesController {
     'SUB_ADMIN',
   )
   @ApiOperation({ summary: 'Delete a class' })
-  async remove(
-    @Param('id') id: string,
-    @Res() res: Response
-  ) {
+  async remove(@Param('id') id: string, @Res() res: Response) {
     await this.classesService.remove(id);
     return res.status(HttpStatus.OK).json({
       statusCode: HttpStatus.OK,
@@ -143,7 +138,7 @@ export class ClassesController {
   async saveSetup(
     @Param('schoolId') schoolId: string,
     @Body() dto: ClassSetupDto,
-    @Res() res: Response
+    @Res() res: Response,
   ) {
     const setup = await this.classesService.saveClassSetup(schoolId, dto);
     return res.status(HttpStatus.OK).json({
@@ -154,24 +149,21 @@ export class ClassesController {
   }
 
   @Get('setup/:schoolId')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(
-  'SUPER_ADMIN',
-  'SCHOOL_OWNER',
-  'DIRECTOR',
-  'PRINCIPAL',
-  'ICT_ADMIN',    
-  'SUB_ADMIN',
-  'TEACHER',
-  'SCHOOL_ADMIN', 
-)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(
+    'SUPER_ADMIN',
+    'SCHOOL_OWNER',
+    'DIRECTOR',
+    'PRINCIPAL',
+    'ICT_ADMIN',
+    'SUB_ADMIN',
+    'TEACHER',
+    'SCHOOL_ADMIN',
+  )
   @ApiOperation({ summary: 'Get class setup for a school' })
-  async getSetup(
-    @Param('schoolId') schoolId: string,
-    @Res() res: Response
-  ) {
+  async getSetup(@Param('schoolId') schoolId: string, @Res() res: Response) {
     const setup = await this.classesService.getClassSetup(schoolId);
-    
+
     if (!setup) {
       return res.status(HttpStatus.OK).json({
         statusCode: HttpStatus.OK,

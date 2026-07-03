@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, PreconditionFailedException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  PreconditionFailedException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ClassSetupDto } from './dto/class-setup.dto';
 import { CreateClassDto } from './dto/create-class.dto';
@@ -18,7 +23,7 @@ export class ClassesService {
 
     if (!classSetup) {
       throw new PreconditionFailedException(
-        'Class setup structure not found for this school. Please complete the school structure setup first before creating individual classes.'
+        'Class setup structure not found for this school. Please complete the school structure setup first before creating individual classes.',
       );
     }
 
@@ -29,7 +34,9 @@ export class ClassesService {
       },
     });
     if (existingClass) {
-      throw new ConflictException(`Class "${name}" already exists for this school`);
+      throw new ConflictException(
+        `Class "${name}" already exists for this school`,
+      );
     }
 
     // 3. Create class and its arms in a transaction
@@ -78,7 +85,7 @@ export class ClassesService {
 
     if (!classSetup) {
       throw new PreconditionFailedException(
-        'Class setup structure not found for this school. Please complete the school structure setup first.'
+        'Class setup structure not found for this school. Please complete the school structure setup first.',
       );
     }
 
@@ -134,7 +141,7 @@ export class ClassesService {
 
     if (!classSetup) {
       throw new PreconditionFailedException(
-        'Class setup structure not found for this school. Please complete the school structure setup first.'
+        'Class setup structure not found for this school. Please complete the school structure setup first.',
       );
     }
 
@@ -202,7 +209,7 @@ export class ClassesService {
   async saveClassSetup(schoolId: string, dto: ClassSetupDto, tx?: any) {
     // Check if school exists
     const prisma = tx || this.prisma;
-    const school = await (prisma as any).school.findUnique({
+    const school = await prisma.school.findUnique({
       where: { id: schoolId },
     });
 
@@ -248,7 +255,11 @@ export class ClassesService {
         });
 
         // Create arms if applicable
-        if (dto.classArm.hasArms && dto.classArm.arms && dto.classArm.arms.length > 0) {
+        if (
+          dto.classArm.hasArms &&
+          dto.classArm.arms &&
+          dto.classArm.arms.length > 0
+        ) {
           await client.classArm.createMany({
             data: dto.classArm.arms.map((armName: string) => ({
               name: armName,
@@ -266,7 +277,7 @@ export class ClassesService {
       return execute(tx);
     }
     return (this.prisma as any).$transaction(execute, {
-      timeout: 15000 // Increase timeout to 15 seconds for bulk operations
+      timeout: 15000, // Increase timeout to 15 seconds for bulk operations
     });
   }
 

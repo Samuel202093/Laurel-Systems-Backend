@@ -13,7 +13,34 @@ export class OtpService {
     private mailService: MailService,
   ) {}
 
+  private async checkEmailExists(email: string): Promise<boolean> {
+    const [
+      existingSuperAdmin,
+      existingSchoolAdmin,
+      existingTeacher,
+      existingStudent,
+    ] = await Promise.all([
+      this.prisma.superAdmin.findUnique({ where: { email } }),
+      this.prisma.schoolAdmin.findUnique({ where: { email } }),
+      this.prisma.teacher.findUnique({ where: { email } }),
+      this.prisma.student.findFirst({ where: { email } }),
+    ]);
+
+    return !!(
+      existingSuperAdmin ||
+      existingSchoolAdmin ||
+      existingTeacher ||
+      existingStudent
+    );
+  }
+
   async sendOtp(email: string) {
+    // Check if email already exists in any user table
+    const emailExists = await this.checkEmailExists(email);
+    if (emailExists) {
+      throw new BadRequestException('Email already exists');
+    }
+
     const code = Math.floor(10000 + Math.random() * 90000).toString(); // 5-digit code
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
@@ -29,7 +56,10 @@ export class OtpService {
     this.logger.log(`OTP generated for ${email}: ${code}`);
 
     // Build the email content
-    const schoolName = this.configService.get<string>('SCHOOL_NAME', 'School Management');
+    const schoolName = this.configService.get<string>(
+      'SCHOOL_NAME',
+      'School Management',
+    );
     const subject = `Your ${schoolName} Onboarding Verification Code`;
     const html = `
         <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 10px;">
@@ -42,6 +72,9 @@ export class OtpService {
               ${code}
             </div>
             <p>This code will expire in <strong>10 minutes</strong>.</p>
+            <p style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 12px; color: #856404; margin-top: 20px;">
+              <strong>Note:</strong> If you don't see this email in your inbox, please check your spam or junk folder.
+            </p>
             <p style="color: #666; font-size: 14px; margin-top: 30px;">If you didn't request this, please ignore this email.</p>
           </div>
           <div style="text-align: center; padding: 20px; font-size: 12px; color: #777; background-color: #f9fafb; border-radius: 0 0 10px 10px;">

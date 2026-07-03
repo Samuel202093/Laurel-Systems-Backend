@@ -41,7 +41,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
  * matches regardless of which field carries the permission.
  */
 const ADMIN_EXAM_ROLES = [
-  'SCHOOL_ADMIN',   // direct role — covers all SCHOOL_ADMIN users
+  'SCHOOL_ADMIN', // direct role — covers all SCHOOL_ADMIN users
   'TEACHER',
   'PRINCIPAL',
   'ICT_ADMIN',
@@ -65,7 +65,10 @@ export class ExamsController {
   @Post('upload')
   @Roles('TEACHER')
   @UseInterceptors(FilesInterceptor('images'))
-  @ApiOperation({ summary: 'Teacher creates a new exam with questions (supports image uploads)' })
+  @ApiOperation({
+    summary:
+      'Teacher creates a new exam with questions (supports image uploads)',
+  })
   @ApiResponse({ status: 201, description: 'Exam created successfully' })
   async uploadExam(
     @Body('payload') payload: string,
@@ -79,8 +82,10 @@ export class ExamsController {
   @Get('teacher/:teacherId')
   @Roles(...ADMIN_EXAM_ROLES)
   @ApiOperation({
-    summary: "Get all exams created by a teacher (list view — no full question bodies)",
-    description: "Returns exam metadata and counts only. Use GET /exams/:id to retrieve full questions.",
+    summary:
+      'Get all exams created by a teacher (list view — no full question bodies)',
+    description:
+      'Returns exam metadata and counts only. Use GET /exams/:id to retrieve full questions.',
   })
   @ApiParam({ name: 'teacherId', description: 'Teacher UUID' })
   async getTeacherExams(@Param('teacherId') teacherId: string) {
@@ -89,10 +94,19 @@ export class ExamsController {
 
   /** School-admin view: all exams for a school (lightweight — no full question bodies) */
   @Get('school/:schoolId')
-  @Roles('SCHOOL_ADMIN', 'PRINCIPAL', 'ICT_ADMIN', 'SCHOOL_OWNER', 'DIRECTOR', 'SUB_ADMIN')
+  @Roles(
+    'SCHOOL_ADMIN',
+    'PRINCIPAL',
+    'ICT_ADMIN',
+    'SCHOOL_OWNER',
+    'DIRECTOR',
+    'SUB_ADMIN',
+  )
   @ApiOperation({
-    summary: 'Get all exams for a school (admin only, list view — no full question bodies)',
-    description: "Returns exam metadata and counts. Use GET /exams/:id for full question details.",
+    summary:
+      'Get all exams for a school (admin only, list view — no full question bodies)',
+    description:
+      'Returns exam metadata and counts. Use GET /exams/:id for full question details.',
   })
   @ApiParam({ name: 'schoolId', description: 'School UUID' })
   async getSchoolExams(@Param('schoolId') schoolId: string) {
@@ -102,7 +116,9 @@ export class ExamsController {
   /** Students filter exams by class/subject */
   @Get('student/filter')
   @Roles('STUDENT', ...ADMIN_EXAM_ROLES)
-  @ApiOperation({ summary: 'Get approved exams for a class/subject (student view)' })
+  @ApiOperation({
+    summary: 'Get approved exams for a class/subject (student view)',
+  })
   @ApiQuery({ name: 'classId', required: true })
   @ApiQuery({ name: 'subjectId', required: true })
   @ApiQuery({ name: 'schoolId', required: true })
@@ -115,7 +131,13 @@ export class ExamsController {
     @Req() req?: any,
   ) {
     const studentId = req?.user?.role === 'STUDENT' ? req.user.sub : undefined;
-    return this.examsService.getExamsByClassAndSubject(classId, subjectId, schoolId, term, studentId);
+    return this.examsService.getExamsByClassAndSubject(
+      classId,
+      subjectId,
+      schoolId,
+      term,
+      studentId,
+    );
   }
 
   /** Get a single exam with all its questions */
@@ -143,7 +165,9 @@ export class ExamsController {
   /** Delete an exam (teacher owner or admin; approved exams are protected) */
   @Delete(':id')
   @Roles(...ADMIN_EXAM_ROLES)
-  @ApiOperation({ summary: 'Delete an exam and all its Cloudinary images (teacher or admin)' })
+  @ApiOperation({
+    summary: 'Delete an exam and all its Cloudinary images (teacher or admin)',
+  })
   @ApiParam({ name: 'id', description: 'Exam UUID' })
   async deleteExam(@Param('id') id: string, @Req() req: any) {
     return this.examsService.deleteExam(id, req.user);
@@ -151,8 +175,18 @@ export class ExamsController {
 
   /** Approve or reject an exam */
   @Patch(':id/approve')
-  @Roles('SCHOOL_ADMIN', 'PRINCIPAL', 'ICT_ADMIN', 'SCHOOL_OWNER', 'DIRECTOR', 'TEACHER')
-  @ApiOperation({ summary: 'Approve or reject an exam (principal, ICT admin, director, form-teacher)' })
+  @Roles(
+    'SCHOOL_ADMIN',
+    'PRINCIPAL',
+    'ICT_ADMIN',
+    'SCHOOL_OWNER',
+    'DIRECTOR',
+    'TEACHER',
+  )
+  @ApiOperation({
+    summary:
+      'Approve or reject an exam (principal, ICT admin, director, form-teacher)',
+  })
   @ApiParam({ name: 'id', description: 'Exam UUID' })
   async approveExam(
     @Param('id') id: string,
@@ -184,7 +218,10 @@ export class ExamsController {
   })
   @ApiParam({ name: 'examId', description: 'Exam UUID' })
   @ApiResponse({ status: 200, description: 'Exam with questions returned' })
-  @ApiResponse({ status: 403, description: 'Forbidden — not the exam owner or admin' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden — not the exam owner or admin',
+  })
   async getExamQuestions(@Param('examId') examId: string, @Req() req: any) {
     return this.examsService.getExamQuestions(examId, req.user);
   }
@@ -198,7 +235,8 @@ export class ExamsController {
   @Roles(...ADMIN_EXAM_ROLES)
   @UseInterceptors(FileInterceptor('image'))
   @ApiOperation({
-    summary: 'Edit a question — teacher owner or admin (SCHOOL_ADMIN, DIRECTOR, ICT_ADMIN)',
+    summary:
+      'Edit a question — teacher owner or admin (SCHOOL_ADMIN, DIRECTOR, ICT_ADMIN)',
   })
   @ApiParam({ name: 'examId', description: 'Exam UUID' })
   @ApiParam({ name: 'questionId', description: 'Question UUID' })
@@ -218,8 +256,15 @@ export class ExamsController {
     )
     file?: Express.Multer.File,
   ) {
-    const parsedUpdates = typeof updates === 'string' ? JSON.parse(updates) : updates;
-    return this.examsService.updateQuestion(examId, questionId, parsedUpdates, req.user, file);
+    const parsedUpdates =
+      typeof updates === 'string' ? JSON.parse(updates) : updates;
+    return this.examsService.updateQuestion(
+      examId,
+      questionId,
+      parsedUpdates,
+      req.user,
+      file,
+    );
   }
 
   /**
@@ -230,7 +275,8 @@ export class ExamsController {
   @Delete(':examId/questions/:questionId')
   @Roles(...ADMIN_EXAM_ROLES)
   @ApiOperation({
-    summary: 'Delete a question and its Cloudinary image — teacher owner or admin (SCHOOL_ADMIN, DIRECTOR, ICT_ADMIN)',
+    summary:
+      'Delete a question and its Cloudinary image — teacher owner or admin (SCHOOL_ADMIN, DIRECTOR, ICT_ADMIN)',
   })
   @ApiParam({ name: 'examId', description: 'Exam UUID' })
   @ApiParam({ name: 'questionId', description: 'Question UUID' })
@@ -270,8 +316,10 @@ export class ExamsController {
   @Patch(':examId/attempts/:attemptId')
   @Roles(...ADMIN_EXAM_ROLES)
   @ApiOperation({
-    summary: 'Override score or add remark on a student attempt — teacher or admin',
-    description: 'Allowed fields: `score` (number), `remark` (string). Status cannot be changed via this endpoint.',
+    summary:
+      'Override score or add remark on a student attempt — teacher or admin',
+    description:
+      'Allowed fields: `score` (number), `remark` (string). Status cannot be changed via this endpoint.',
   })
   @ApiParam({ name: 'examId', description: 'Exam UUID' })
   @ApiParam({ name: 'attemptId', description: 'ExamAttempt UUID' })
@@ -290,7 +338,12 @@ export class ExamsController {
     @Body() updates: any,
     @Req() req: any,
   ) {
-    return this.examsService.updateExamAttempt(examId, attemptId, updates, req.user);
+    return this.examsService.updateExamAttempt(
+      examId,
+      attemptId,
+      updates,
+      req.user,
+    );
   }
 
   /**
@@ -319,7 +372,8 @@ export class ExamsController {
   @HttpCode(HttpStatus.OK)
   @Roles(...ADMIN_EXAM_ROLES)
   @ApiOperation({
-    summary: 'Send compiled class exam results to the teacher by email (manual trigger)',
+    summary:
+      'Send compiled class exam results to the teacher by email (manual trigger)',
     description:
       'Compiles all SUBMITTED attempts for the exam and emails the teacher a ranked result table. ' +
       'An automatic debounced email is sent after student submissions; this endpoint forces an immediate re-send. ' +
@@ -327,7 +381,10 @@ export class ExamsController {
   })
   @ApiParam({ name: 'examId', description: 'Exam UUID' })
   @ApiResponse({ status: 200, description: 'Email dispatched to teacher' })
-  @ApiResponse({ status: 400, description: 'No submitted attempts / teacher email not set' })
+  @ApiResponse({
+    status: 400,
+    description: 'No submitted attempts / teacher email not set',
+  })
   async notifyTeacher(@Param('examId') examId: string, @Req() req: any) {
     return this.examsService.sendExamResultsToTeacher(examId, req.user);
   }
@@ -353,7 +410,9 @@ export class ExamsController {
 
   @Post(':id/start')
   @Roles('STUDENT')
-  @ApiOperation({ summary: 'Student starts an exam — creates an IN_PROGRESS attempt' })
+  @ApiOperation({
+    summary: 'Student starts an exam — creates an IN_PROGRESS attempt',
+  })
   @ApiParam({ name: 'id', description: 'Exam UUID' })
   async startExam(@Param('id') id: string, @Req() req: any) {
     return this.examsService.startExam(id, req.user.sub);
@@ -362,7 +421,8 @@ export class ExamsController {
   @Post(':id/submit')
   @Roles('STUDENT')
   @ApiOperation({
-    summary: 'Student submits answers — auto-graded; teacher receives a debounced compiled results email',
+    summary:
+      'Student submits answers — auto-graded; teacher receives a debounced compiled results email',
     description:
       'Grades answers immediately, persists the score, and triggers a debounced teacher notification ' +
       '(at most once every 5 minutes per exam). Response includes score, total marks, percentage, and school name.',

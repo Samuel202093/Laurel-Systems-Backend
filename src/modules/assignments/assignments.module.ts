@@ -12,4 +12,3 @@ import { MailModule } from '../mail/mail.module';
   providers: [AssignmentsService],
 })
 export class AssignmentsModule {}
-

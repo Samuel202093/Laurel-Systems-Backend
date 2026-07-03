@@ -1,20 +1,25 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsArray, IsEnum, IsNotEmpty, IsOptional,
-  IsString, IsUUID, ValidateNested,
+  IsArray,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum PaymentProcessor {
-  PAYSTACK    = 'paystack',
-  KORAPAY     = 'korapay',
+  PAYSTACK = 'paystack',
+  KORAPAY = 'korapay',
   FLUTTERWAVE = 'flutterwave',
 }
 
 export enum PaymentChannel {
-  CARD          = 'card',
+  CARD = 'card',
   BANK_TRANSFER = 'bank_transfer', // Virtual account / NIP transfer — cheapest option
-  USSD          = 'ussd',
+  USSD = 'ussd',
 }
 
 export class PaymentFeeItemDto {
@@ -45,7 +50,8 @@ export class InitiatePaymentDto {
   @ApiPropertyOptional({
     enum: PaymentChannel,
     example: PaymentChannel.BANK_TRANSFER,
-    description: 'Payment channel. Use bank_transfer to avoid card processing fees (recommended for large school fees)',
+    description:
+      'Payment channel. Use bank_transfer to avoid card processing fees (recommended for large school fees)',
   })
   @IsOptional()
   @IsEnum(PaymentChannel)

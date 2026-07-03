@@ -1,4 +1,8 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
@@ -17,7 +21,9 @@ export class SubjectsService {
     });
 
     if (existingSubject) {
-      throw new ConflictException(`Subject with name "${dto.name}" already exists in this school`);
+      throw new ConflictException(
+        `Subject with name "${dto.name}" already exists in this school`,
+      );
     }
 
     // Check if code is unique if provided
@@ -29,7 +35,9 @@ export class SubjectsService {
         },
       });
       if (existingCode) {
-        throw new ConflictException(`Subject with code "${dto.code}" already exists in this school`);
+        throw new ConflictException(
+          `Subject with code "${dto.code}" already exists in this school`,
+        );
       }
     }
 
@@ -73,7 +81,9 @@ export class SubjectsService {
         },
       });
       if (existingName) {
-        throw new ConflictException(`Subject with name "${dto.name}" already exists`);
+        throw new ConflictException(
+          `Subject with name "${dto.name}" already exists`,
+        );
       }
     }
 
@@ -87,7 +97,9 @@ export class SubjectsService {
         },
       });
       if (existingCode) {
-        throw new ConflictException(`Subject with code "${dto.code}" already exists`);
+        throw new ConflictException(
+          `Subject with code "${dto.code}" already exists`,
+        );
       }
     }
 

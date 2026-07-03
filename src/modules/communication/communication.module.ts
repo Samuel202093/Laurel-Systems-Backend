@@ -8,7 +8,13 @@ import { AuthModule } from '../auth/auth.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 @Module({
-  imports: [ConfigModule, MailModule, PrismaModule, AuthModule, CloudinaryModule],
+  imports: [
+    ConfigModule,
+    MailModule,
+    PrismaModule,
+    AuthModule,
+    CloudinaryModule,
+  ],
   controllers: [CommunicationController],
   providers: [CommunicationService],
   exports: [CommunicationService],

@@ -35,7 +35,10 @@ export class MailService {
     // Verify transporter config on startup so misconfiguration is caught early
     this.transporter.verify((error) => {
       if (error) {
-        this.logger.error(`Mail transporter verification failed: ${error.message}`, error.stack);
+        this.logger.error(
+          `Mail transporter verification failed: ${error.message}`,
+          error.stack,
+        );
       } else {
         this.logger.log('Mail transporter is ready to send messages');
       }
@@ -61,7 +64,9 @@ export class MailService {
         : bcc
       : undefined;
 
-    this.logger.log(`Attempting to send email to: ${recipients} | subject: ${subject}`);
+    this.logger.log(
+      `Attempting to send email to: ${recipients} | subject: ${subject}`,
+    );
 
     try {
       const result = await this.transporter.sendMail({
@@ -71,7 +76,9 @@ export class MailService {
         subject,
         html,
       });
-      this.logger.log(`Email sent successfully. MessageId: ${result.messageId}`);
+      this.logger.log(
+        `Email sent successfully. MessageId: ${result.messageId}`,
+      );
       return result;
     } catch (error) {
       this.logger.error(
@@ -92,7 +99,8 @@ export class MailService {
     const finalSchoolName =
       schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
     const loginUrl =
-      this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000') + '/login';
+      this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000') +
+      '/login';
 
     const html = `
       <!DOCTYPE html>
@@ -169,7 +177,8 @@ export class MailService {
     const finalSchoolName =
       schoolName || this.configService.get<string>('SCHOOL_NAME', 'Our School');
     const loginUrl =
-      this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000') + '/login';
+      this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000') +
+      '/login';
 
     const html = `
       <!DOCTYPE html>
@@ -296,7 +305,12 @@ export class MailService {
       </html>
     `;
 
-    return this.sendMail(email, `Security Update - Password Changed`, html, finalSchoolName);
+    return this.sendMail(
+      email,
+      `Security Update - Password Changed`,
+      html,
+      finalSchoolName,
+    );
   }
 
   async sendAssignmentNotificationEmail(
@@ -351,7 +365,13 @@ export class MailService {
 
   async sendExamClassResultsToTeacher(data: {
     teacher: { fullName: string; email: string };
-    exam: { title: string; totalMarks: number; subject: any; class: any; term: string };
+    exam: {
+      title: string;
+      totalMarks: number;
+      subject: any;
+      class: any;
+      term: string;
+    };
     attempts: any[];
     school: { name: string; shortName: string | null };
   }) {

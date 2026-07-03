@@ -1,4 +1,13 @@
-import { IsString, IsEmail, IsNotEmpty, IsOptional, IsEnum, MinLength, IsBoolean, IsUrl } from 'class-validator';
+import {
+  IsString,
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsEnum,
+  MinLength,
+  IsBoolean,
+  IsUrl,
+} from 'class-validator';
 
 export enum UserRole {
   SCHOOL_OWNER = 'school owner',
